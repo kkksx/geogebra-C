@@ -22,8 +22,8 @@ void Display()
 
 void MouseEventProcess(int x, int y, int key, int event)
 {
-	static double lastDx = -1;
-	static double lastDy = -1;
+	static double lastDx = -1;	// 记录上一次鼠标事件的位置
+	static double lastDy = -1;  // 同上
 	double dx = ScaleXInches(x);
 	double dy = ScaleYInches(y);
 
@@ -68,7 +68,7 @@ void MouseEventProcess(int x, int y, int key, int event)
 void Main()
 {
 	SetWindowTitle("test");
-	SetWindowSize(10, 5);
+	SetWindowSize(20, 10);
 	InitGraphics();
 	BG_init();
 
@@ -86,7 +86,7 @@ void Main()
 	MovePen(2, 5);
 	DrawLine(1, 1);
 
-	BG_addPoint(5, 5);
+	BG_addPoint(2, 3);
 	
 
 

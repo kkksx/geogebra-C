@@ -54,14 +54,15 @@ typedef struct
 
 /*
 * 接口：BG_init
-* 功能：进行一些初始化，该函数应当被首先调用
+* 功能：进行一些初始化
+*		该函数应当被首先调用
 */
 void BG_init();
 
 
 /*
 * 接口：BG_addPoint
-* 功能：加一个点
+* 功能：加一个坐标为(x, y)的点
 */
 void BG_addPoint(double x, double y);
 
@@ -76,6 +77,23 @@ void BG_addLine(double x1, double y1, double x2, double y2, int type);
 * 功能：构造一个从a到b的向量
 */
 void BG_addVector(double x1, double y1, double x2, double y2);
+
+
+
+/*
+* 接口：BG_axisToInchX / BG_axisToInchY
+* 功能：获取坐标系内横坐标x / 纵坐标y在窗口内的位置
+*	    如果该坐标不在窗口内将返回负值
+*/
+double BG_axisToInchX(double x);
+double BG_axisToInchY(double y);
+
+/*
+* 接口：BG_inchToAxisX / BG_inchToAxisY
+* 功能：获取窗口内位置在坐标系内的横坐标x / 纵坐标y
+*/
+double BG_inchToAxisX(double x);
+double BG_inchToAxisY(double y);
 
 
 

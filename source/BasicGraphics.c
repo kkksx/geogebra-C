@@ -6,7 +6,10 @@
 *	ReferenceAxis.h
 * 中定义的接口
 * 
-* 提供绘图功能
+* 此模块影响的范围仅限于绘图区域
+* 
+* 数值距离：以数字形式写出来的距离，即在坐标轴内的距离
+* 实际距离：占窗口的英寸
 * 
 * 以下颜色可用
     DefineColor("Black", 0, 0, 0);
@@ -44,11 +47,12 @@
 
 #define EPSILON 0.00000001
 
-// 窗口属性
-static double s_windowWidth;
-static double s_windowHeight;
 
-// 坐标轴的属性（数值距离：以数字形式写出来的距离，实际距离：占窗口的英寸）
+// 窗口属性
+static double s_windowWidth;	// 绘图区域宽度
+static double s_windowHeight;	// 绘图区域高度
+
+// 坐标轴的属性
 static double s_axisCalibration = 1;		// 坐标轴的刻度，原点到第一条刻度线的数值距离，该值只能是pow(2, n)
 static double s_axisInches = 2;				// 原点到第一条刻度线的实际距离，应该保证该值在[1.3, 2.6)的范围
 static double s_axisX = 0, s_axisY = 0;		// 窗口中心点的数值坐标
@@ -67,16 +71,22 @@ static string s_penColor;			// 画笔颜色
 
 // -----------------------静态函数声明---------------------
 
-static void s_drawPoint(BG_Point* point);
-static void s_drawLine(BG_Line* line);
 static void s_savePenStatus();
 static void s_loadPenStatus();
+static bool s_inAxis(double x, double y);
 
+static void s_drawPoint(BG_Point* point);
+static void s_drawLine(BG_Line* line);
+
+// 封装一些方便的函数
 static void s_drawCircle(double x, double y, double r);
 static void s_drawName(double x, double y, string name);
+static void s_drawDouble(double x, double y, double number);
 static void s_drawALine(double x1, double y1, double x2, double y2);
 
 static void s_RA_drawLine(double x, double y, int type, int style);
+static double s_RA_findX();
+static double s_RA_findY();
 
 
 
@@ -85,8 +95,8 @@ static void s_RA_drawLine(double x, double y, int type, int style);
 void BG_init()
 {
 	// 初始化窗口信息
-	s_windowWidth = GetWindowWidth();
-	s_windowHeight = GetWindowHeight();
+	s_windowWidth = GetWindowWidth();		// 注意这里，画坐标系的窗口
+	s_windowHeight = GetWindowHeight();		// 不一定是整个窗口范围，这里只是一个示范
 
 	// 初始化链表
 	s_listPoint = NewLinkedList();
@@ -101,12 +111,14 @@ void RA_createAxis()
 {
 	double centerX = s_windowWidth / 2;
 	double centerY = s_windowHeight / 2;
-	double scale = s_axisCalibration / s_axisInches;  // 单位英寸的实际长度
+	double scale = s_axisCalibration / s_axisInches;  // 单位英寸的数值长度
 
-	double nearX = s_axisCalibration * floor(s_axisX / s_axisCalibration);
-	double nearY = s_axisCalibration * floor(s_axisY / s_axisCalibration);
+	double nearX = s_axisCalibration * floor(s_axisX / s_axisCalibration);	// 离中心点最近的坐标
+	double nearY = s_axisCalibration * floor(s_axisY / s_axisCalibration);	// 该坐标是数值坐标
 	
 	int j;
+
+	// 浅色part
 
 	double x = nearX;
 	double inchesX = centerX + (nearX - s_axisX) / scale;
@@ -154,12 +166,21 @@ void RA_createAxis()
 
 	// 深色part
 
+	double X = s_RA_findX();  // 水平数字的位置
+	X = X < GetFontHeight() ? GetFontHeight() :	X - GetFontHeight();
+	double Y = s_RA_findY();  // 竖直数字的位置
+
 	x = nearX;
 	inchesX = centerX + (nearX - s_axisX) / scale;
 	for (; inchesX <= s_windowWidth; x += s_axisCalibration, inchesX += s_axisInches)
 	{
 		if (fabs(x) <= EPSILON) s_RA_drawLine(inchesX, nearY, 1, 0);
-		else s_RA_drawLine(inchesX, nearY, 1, 1);
+		else
+		{
+			s_RA_drawLine(inchesX, nearY, 1, 1);
+			char str[20]; sprintf(str, "%g", x);
+			s_drawDouble(inchesX - TextStringWidth(str) / 2, X, x);
+		}
 	}
 
 	x = nearX;
@@ -167,7 +188,12 @@ void RA_createAxis()
 	for (; inchesX >= 0; x -= s_axisCalibration, inchesX -= s_axisInches)
 	{
 		if (fabs(x) <= EPSILON) s_RA_drawLine(inchesX, nearY, 1, 0);
-		else s_RA_drawLine(inchesX, nearY, 1, 1);
+		else
+		{
+			s_RA_drawLine(inchesX, nearY, 1, 1);
+			char str[20]; sprintf(str, "%g", x);
+			s_drawDouble(inchesX - TextStringWidth(str) / 2, X, x);
+		}
 	}
 
 	y = nearY;
@@ -175,7 +201,13 @@ void RA_createAxis()
 	for (; inchesY <= s_windowHeight; y += s_axisCalibration, inchesY += s_axisInches)
 	{
 		if (fabs(y) <= EPSILON) s_RA_drawLine(nearX, inchesY, 0, 0);
-		else s_RA_drawLine(nearX, inchesY, 0, 1);
+		else
+		{
+			s_RA_drawLine(nearX, inchesY, 0, 1);
+			char str[20]; sprintf(str, "%g", y);
+			double width = TextStringWidth(str);
+			s_drawDouble(Y > width ? Y - width : 0, inchesY - GetFontHeight() / 3, y);
+		}
 	}
 
 	y = nearY;
@@ -183,7 +215,13 @@ void RA_createAxis()
 	for (; inchesY >= 0; y -= s_axisCalibration, inchesY -= s_axisInches)
 	{
 		if (fabs(y) <= EPSILON) s_RA_drawLine(nearX, inchesY, 0, 0);
-		else s_RA_drawLine(nearX, inchesY, 0, 1);
+		else
+		{
+			s_RA_drawLine(nearX, inchesY, 0, 1);
+			char str[20]; sprintf(str, "%g", y);
+			double width = TextStringWidth(str);
+			s_drawDouble(Y > width ? Y - width : 0, inchesY - GetFontHeight() / 3, y);
+		}
 	}
 
 }
@@ -192,6 +230,7 @@ void RA_roll(int up)
 {
 	if (up)
 	{
+		if (s_axisCalibration < 0.001) return;
 		s_axisInches += 0.1;
 		if (fabs(s_axisInches - 2.6) <= EPSILON)
 		{
@@ -201,6 +240,7 @@ void RA_roll(int up)
 	}
 	else
 	{
+		if (s_axisCalibration > 100000000.0) return;
 		s_axisInches -= 0.1;
 		if (fabs(s_axisInches - 1.2) <= EPSILON)
 		{
@@ -244,6 +284,16 @@ void BG_addVector(double x1, double y1, double x2, double y2)
 
 
 //------------------------静态函数实现----------------------------
+
+/*
+* 函数：s_inAxis
+* 功能：判断实际坐标为(x, y)的点是否在坐标系内
+*		坐标系的具体范围应另外确定
+*/
+static bool s_inAxis(double x, double y)
+{
+	return (0 <= x && x <= s_windowWidth && 0 <= y && y <= s_windowHeight);
+}
 
 /*
 * 函数：s_savePenStatus
@@ -318,6 +368,18 @@ static void s_drawCircle(double x, double y, double r)
 }
 
 /*
+* 函数：s_drawDouble
+* 功能：在指定位置输出一个数
+*/
+static void s_drawDouble(double x, double y, double number)
+{
+	char str[20];
+	sprintf(str, "%g", number);
+	MovePen(x, y);
+	DrawTextString(str);
+}
+
+/*
 * 函数：s_drawALine
 * 功能：画一条线段
 */
@@ -378,10 +440,33 @@ static void s_RA_drawLine(double x, double y, int type, int style)
 	s_loadPenStatus();
 }
 
+/*
+* 函数：s_RA_findX
+* 功能：求出X轴的实际位置
+*		如果低于0，返回0；如果高于窗口，则返回窗口高度
+*/
+static double s_RA_findX()
+{
+	double scale = s_axisCalibration / s_axisInches;
+	double Y = s_windowHeight / 2 - s_axisY / scale;
+	Y = Y > 0 ? Y : 0;
+	Y = Y < s_windowHeight ? Y : s_windowHeight;
+	return Y;
+}
 
-
-
-
+/*
+* 函数：s_RA_findY
+* 功能：求出Y轴的实际位置
+*		如果低于0，返回0；如果高于窗口，则返回窗口宽度
+*/
+static double s_RA_findY()
+{
+	double scale = s_axisCalibration / s_axisInches;
+	double X = s_windowWidth / 2 - s_axisX / scale;
+	X = X > 0 ? X : 0;
+	X = X < s_windowWidth ? X : s_windowWidth;
+	return X;
+}
 
 
 
