@@ -17,6 +17,7 @@
 #include <time.h>
 #include <wincon.h>
 #include <Windows.h>
+#include <WinUser.h>
 
 #include "genlib.h"
 #include "gcalloc.h"
@@ -857,6 +858,7 @@ static void InitDisplay(void)
 	g_mouse = NULL;
 	g_timer = NULL;
     
+    /* 窗口的各个属性 */
     wndcls.cbClsExtra = 0;
     wndcls.cbWndExtra = 0;
     wndcls.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
@@ -1066,7 +1068,6 @@ static void RegisterWindowClass(void)
  * graphics window.  The only event this package needs to handle
  * is the paint event, which forces a screen update.
  */
-
 static LONG FAR PASCAL GraphicsEventProc(HWND hwnd, UINT msg,
                                          WPARAM wParam, LPARAM lParam)
 {
@@ -1162,7 +1163,7 @@ static LONG FAR PASCAL GraphicsEventProc(HWND hwnd, UINT msg,
     		return 0;
         case WM_DESTROY:
             PostQuitMessage(0);
-            return 0;   
+            return 0;
 
         default:
             return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -1723,6 +1724,10 @@ static void InitColors(void)
     DefineColor("Violet", .93, .5, .93);
     DefineColor("Magenta", 1, 0, 1);
     DefineColor("Cyan", 0, 1, 1);
+
+    DefineColor("my Blue", .4, .65, 1);
+    DefineColor("nearly white", 0.95, 0.95, 1); 
+    DefineColor("somehow white", 0.8, 0.8, 0.9);
 }
 
 /*
@@ -2002,3 +2007,41 @@ double ScaleYInches(int y)/*y coordinate from pixels to inches*/
 {
  	  return GetWindowHeight()-(double)y/GetYResolution();
 } 	   
+
+
+
+/*
+* 从此处开始是新的内容
+* ----------------------------------------------
+*/
+
+
+#include "SimpleGUI.h"
+  
+static int s_button_ID = 3301;      // 按钮的ID
+
+// !!!文件路径上还有一些问题，此处还未完善
+void GUI_addButton(double x, double y, double w, double h, char* file)
+{
+    ++s_button_ID;
+    double fx = ScaleX(x);
+    double fy = ScaleY(y);
+    double fw = ScaleX(w);
+    double fh = ScaleY(GetWindowHeight() - h);
+
+    HWND hButton = CreateWindow("Button", "", WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | BS_BITMAP,
+        fx, fy, fw, fh, graphicsWindow, (HMENU)s_button_ID, NULL, NULL);
+
+    HBITMAP hBmp = (HBITMAP)LoadImage(NULL, file, IMAGE_BITMAP, fw, fh, LR_LOADFROMFILE);
+    if (!hBmp) exit(0);
+
+    //发送消息
+    SendMessage(hButton, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)hBmp);
+}
+
+
+
+void GUI_addBitmap()
+{
+
+}

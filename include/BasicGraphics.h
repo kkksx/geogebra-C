@@ -11,6 +11,8 @@
 */
 
 #include "boolean.h"
+#include "genlib.h"
+#include "strlib.h"
 
 /*
 * 定义了基础的数据结构
@@ -18,27 +20,62 @@
 */
 
 
+/*
+* 结构：点
+*/
 typedef struct
 {
 	double x, y;  // 坐标
+	string name;  // 命名
 }BG_Point;
 
 
+/*
+* 结构：线
+*/
 typedef struct
 {
 	BG_Point point[2];   // 端点
-	int type;            // 0线段、1射线、2直线
-
+	string	 name;		 // 命名
+	int		 type;       // 0线段、1射线、2直线
 }BG_Line;
 
 
+/*
+* 结构：向量
+*/
 typedef struct
 {
 	BG_Point point[2];   // 端点
+	string   name;       // 命名
 }BG_Vector;
 
 
 
+/*
+* 接口：BG_init
+* 功能：进行一些初始化，该函数应当被首先调用
+*/
+void BG_init();
+
+
+/*
+* 接口：BG_addPoint
+* 功能：加一个点
+*/
+void BG_addPoint(double x, double y);
+
+/*
+* 接口：BG_addLine
+* 功能：将给定的两个点连线，以此创建一条线，并指定类型
+*/
+void BG_addLine(double x1, double y1, double x2, double y2, int type);
+
+/*
+* 接口：BG_addVector
+* 功能：构造一个从a到b的向量
+*/
+void BG_addVector(double x1, double y1, double x2, double y2);
 
 
 

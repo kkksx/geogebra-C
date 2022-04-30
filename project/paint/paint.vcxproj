@@ -34,6 +34,7 @@
     <ClInclude Include="..\..\include\BasicGraphics.h" />
     <ClInclude Include="..\..\include\NameLib.h" />
     <ClInclude Include="..\..\include\ReferenceAxis.h" />
+    <ClInclude Include="..\..\include\SimpleGUI.h" />
     <ClInclude Include="..\..\libgraphics\boolean.h" />
     <ClInclude Include="..\..\libgraphics\exception.h" />
     <ClInclude Include="..\..\libgraphics\extgraph.h" />
@@ -124,7 +125,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_CRT_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>../../libgraphics;../../include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../libgraphics;../../include;./</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -139,7 +140,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_CRT_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>../../libgraphics;../../include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../libgraphics;../../include;./</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

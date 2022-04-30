@@ -11,7 +11,7 @@
 
 static string  s_greekLetter[] = { "α", "β", "γ", "δ", "θ", "ε" };  // 希腊字母表
 
-static bool    s_greekLetterMap[1000];	// 希腊字母使用情况
+static bool    s_greekLetterMap[1000];	    // 希腊字母使用情况
 static bool    s_lowerCaseMap[1000];		// 小写字母使用情况
 static bool    s_upperCaseMap[1000];		// 大写字母使用情况
 
@@ -19,39 +19,28 @@ static int s_getID(bool* a);						// 取得一个还没使用过的ID
 static bool s_deleteID(bool* a, int id);			// 回收一个ID
 
 
-/*
-* 函数：NL_getLowerCase()
-* 作用：返回一个小写字母名，如a，d1
-*/
+
 string NL_getLowerCase()
 {
-	string name = "";
+	string name = malloc(sizeof(char) * 5);
 	int id = s_getID(s_lowerCaseMap);
 	if (id >= 26) sprintf(name, "%c%d", 'a' + id % 26, id / 26);
 	else sprintf(name, "%c", 'a' + id % 26);
 	return name;
 }
 
-/*
-* 函数：NL_getUpperCase()
-* 作用：返回一个大写字母名，如B，C2
-*/
 string NL_getUpperCase()
 {
-	string name = "";
+	string name = malloc(sizeof(char) * 5);
 	int id = s_getID(s_upperCaseMap);
 	if (id >= 26) sprintf(name, "%c%d", 'A' + id % 26, id / 26);
 	else sprintf(name, "%c", 'A' + id % 26);
 	return name;
 }
 
-/*
-* 函数：NL_getGreekLetter()
-* 作用：返回一个希腊字母名
-*/
 string NL_getGreekLetter()
 {
-	string name = "";
+	string name = malloc(sizeof(char) * 5);
 	int id = s_getID(s_greekLetterMap);
 	name = s_greekLetter[id % MAX_GREEK];
 	if (id >= MAX_GREEK) name = Concat(name, IntegerToString(id / 6));
