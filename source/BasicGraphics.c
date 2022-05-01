@@ -54,7 +54,7 @@ static double s_windowHeight;	// 绘图区域高度
 
 // 坐标轴的属性
 static double s_axisCalibration = 1;		// 坐标轴的刻度，原点到第一条刻度线的数值距离，该值只能是pow(2, n)
-static double s_axisInches = 2;				// 原点到第一条刻度线的实际距离，应该保证该值在[1.3, 2.6)的范围
+static double s_axisInches = 1;				// 原点到第一条刻度线的实际距离，应该保证该值在[1, 2)的范围
 static double s_axisX = 0, s_axisY = 0;		// 窗口中心点的数值坐标
 
 // 记录图像，在链表中==已经被绘出
@@ -84,6 +84,7 @@ static void s_drawName(double x, double y, string name);
 static void s_drawDouble(double x, double y, double number);
 static void s_drawALine(double x1, double y1, double x2, double y2);
 
+// RA会调用的静态函数
 static void s_RA_drawLine(double x, double y, int type, int style);
 static double s_RA_findX();
 static double s_RA_findY();
@@ -91,19 +92,7 @@ static double s_RA_findY();
 
 
 
-// 初始化
-void BG_init()
-{
-	// 初始化窗口信息
-	s_windowWidth = GetWindowWidth();		// 注意这里，画坐标系的窗口
-	s_windowHeight = GetWindowHeight();		// 不一定是整个窗口范围，这里只是一个示范
 
-	// 初始化链表
-	s_listPoint = NewLinkedList();
-	s_listLine = NewLinkedList();
-	s_listVector = NewLinkedList();
-
-}
 
 //-----------------ReferenceAxis.h接口实现-----------------------
 
@@ -232,20 +221,20 @@ void RA_roll(int up)
 	{
 		if (s_axisCalibration < 0.001) return;
 		s_axisInches += 0.1;
-		if (fabs(s_axisInches - 2.6) <= EPSILON)
+		if (fabs(s_axisInches - 2) <= EPSILON)
 		{
 			s_axisCalibration /= 2;
-			s_axisInches = 1.3;
+			s_axisInches = 1;
 		}
 	}
 	else
 	{
 		if (s_axisCalibration > 100000000.0) return;
 		s_axisInches -= 0.1;
-		if (fabs(s_axisInches - 1.2) <= EPSILON)
+		if (fabs(s_axisInches - 0.9) <= EPSILON)
 		{
 			s_axisCalibration *= 2;
-			s_axisInches = 2.5;
+			s_axisInches = 1.9;
 		}
 	}
 }
@@ -258,6 +247,35 @@ void RA_move(double x, double y)
 
 
 //-----------------BasicGraphics.h接口实现-----------------------
+
+// !!初始化!!
+void BG_init()
+{
+	// 初始化窗口信息
+	s_windowWidth = GetWindowWidth();		// 注意这里，画坐标系的窗口
+	s_windowHeight = GetWindowHeight();		// 不一定是整个窗口范围，这里只是一个示范
+
+	// 初始化链表
+	s_listPoint = NewLinkedList();
+	s_listLine = NewLinkedList();
+	s_listVector = NewLinkedList();
+
+}
+
+void BG_repaint()
+{
+	linkedlistADT now;
+	// 线
+	for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
+	{
+		s_drawLine(NodeObj(s_listLine, now));
+	}
+	// 点
+	for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
+	{
+		s_drawPoint(NodeObj(s_listPoint, now));
+	}
+}
 
 void BG_addPoint(double x, double y)
 {
@@ -273,13 +291,46 @@ void BG_addPoint(double x, double y)
 
 void BG_addLine(double x1, double y1, double x2, double y2, int type)
 {
-	
+	BG_Line* line = New(BG_Line*);
+	line->point[0] = (BG_Point){ x1, y1, "" };
+	line->point[1] = (BG_Point){ x2, y2, "" };
+	line->type = type;
+	line->name = NL_getLowerCase();
+	InsertNode(s_listLine, NULL, line);
+
+	s_drawLine(line);
 }
 
 void BG_addVector(double x1, double y1, double x2, double y2)
 {
 
 }
+
+
+double BG_axisToInchX(double x)
+{
+	double scale = s_axisCalibration / s_axisInches;
+	return s_windowWidth / 2 + (x - s_axisX) / scale;
+}
+
+double BG_axisToInchY(double y)
+{
+	double scale = s_axisCalibration / s_axisInches;
+	return s_windowHeight / 2 + (y - s_axisY) / scale;
+}
+
+double BG_inchToAxisX(double x)
+{
+	double scale = s_axisCalibration / s_axisInches;
+	return s_axisX + (x - s_windowWidth / 2) * scale;
+}
+
+double BG_inchToAxisY(double y)
+{
+	double scale = s_axisCalibration / s_axisInches;
+	return s_axisY + (y - s_windowHeight / 2) * scale;
+}
+
 
 
 
@@ -338,21 +389,61 @@ static void s_drawName(double x, double y, string name)
 */
 static void s_drawPoint(BG_Point* point)
 {
+	if (point == NULL) return;
 	s_savePenStatus();
+
+	double x = BG_axisToInchX(point->x);
+	double y = BG_axisToInchY(point->y);
 
 	SetPenSize(1);
 
 	// 画圆
 	StartFilledRegion(1);
 	SetPenColor("my blue");
-	s_drawCircle(point->x, point->y, 0.08);
+	s_drawCircle(x, y, 0.08);
 	EndFilledRegion();
 	
 	SetPenColor("black");
-	s_drawCircle(point->x, point->y, 0.09);
+	s_drawCircle(x, y, 0.09);
 	
 	// 编号
-	s_drawName(point->x + 0.1, point->y + 0.1, point->name);
+	s_drawName(x + 0.1, y + 0.1, point->name);
+
+	s_loadPenStatus();
+}
+
+/*
+* 函数：s_drawLine
+* 功能：绘出一条线（仅画线，不画点）
+*/
+static void s_drawLine(BG_Line* line)
+{
+	if (line == NULL) return;
+	s_savePenStatus();
+
+	SetPenSize(3);
+	SetPenColor("black");
+	
+	double x1 = BG_axisToInchX(line->point[0].x);
+	double y1 = BG_axisToInchY(line->point[0].y);
+	double x2 = BG_axisToInchX(line->point[1].x);
+	double y2 = BG_axisToInchY(line->point[1].y);
+
+	switch (line->type)
+	{
+	case 0:   // 直线 
+		if (fabs(x2 - x1) <= EPSILON) s_drawALine(x1, 0, x1, s_windowHeight);
+		else s_drawALine(0, -x1 * (y2 - y1) / (x2 - x1) + y1,
+			 s_windowWidth, (s_windowWidth - x1) * (y2 - y1) / (x2 - x1) + y1);
+		break;
+	case 1:	  // 射线
+		if (fabs(x2 - x1) <= EPSILON) s_drawALine(x1, y1, x1, s_windowHeight);
+		else if(x1 < x2) s_drawALine(x1, y1, s_windowWidth, (s_windowWidth - x1) * (y2 - y1) / (x2 - x1) + y1);
+		else s_drawALine(x1, y1, 0, -x1 * (y2 - y1) / (x2 - x1) + y1);
+		break;
+	default:  // 线段
+		s_drawALine(x1, y1, x2, y2);
+	}
 
 	s_loadPenStatus();
 }

@@ -2033,7 +2033,9 @@ void GUI_addButton(double x, double y, double w, double h, char* file)
         fx, fy, fw, fh, graphicsWindow, (HMENU)s_button_ID, NULL, NULL);
 
     HBITMAP hBmp = (HBITMAP)LoadImage(NULL, file, IMAGE_BITMAP, fw, fh, LR_LOADFROMFILE);
-    if (!hBmp) exit(0);
+    if (!hBmp) hBmp = (HBITMAP)LoadImage(NULL, Concat("../", file), IMAGE_BITMAP, fw, fh, LR_LOADFROMFILE);
+  
+    if (!hBmp) exit(0);     // 这个地方要改改
 
     //发送消息
     SendMessage(hButton, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)hBmp);

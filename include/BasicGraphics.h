@@ -59,10 +59,17 @@ typedef struct
 */
 void BG_init();
 
+/*
+* 接口：BG_repaint
+* 功能：将所有的图像进行重画
+*/
+void BG_repaint();
+
 
 /*
 * 接口：BG_addPoint
 * 功能：加一个坐标为(x, y)的点
+*		其中x和y是数值坐标
 */
 void BG_addPoint(double x, double y);
 
@@ -83,7 +90,6 @@ void BG_addVector(double x1, double y1, double x2, double y2);
 /*
 * 接口：BG_axisToInchX / BG_axisToInchY
 * 功能：获取坐标系内横坐标x / 纵坐标y在窗口内的位置
-*	    如果该坐标不在窗口内将返回负值
 */
 double BG_axisToInchX(double x);
 double BG_axisToInchY(double y);

@@ -12,6 +12,7 @@ obj/
  
  
 Debug/
+Release/
 ipch/
 *.sln
 *.db
