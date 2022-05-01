@@ -12,22 +12,8 @@
 * 实际距离：占窗口的英寸
 * 
 * 以下颜色可用
-    DefineColor("Black", 0, 0, 0);
-    DefineColor("Dark Gray", .35, .35, .35);
-    DefineColor("Gray", .6, .6, .6);
-    DefineColor("Light Gray", .75, .75, .75);
-    DefineColor("White", 1, 1, 1);
-    DefineColor("Red", 1, 0, 0);
-    DefineColor("Orange", 1, .40, .1);
-    DefineColor("Yellow", 1, 1, 0);
-    DefineColor("Green", 0, 1, 0);
-    DefineColor("Blue", 0, 0, 1);
-    DefineColor("Violet", .93, .5, .93);
-    DefineColor("Magenta", 1, 0, 1);
-    DefineColor("Cyan", 0, 1, 1);
-
 	DefineColor("my Blue", .4, .65, 1);				用于给点染色
-	DefineColor("nearly white", 0.95, 0.95, 1);		2类型坐标轴
+	DefineColor("nearly white", 0.9, 0.9, 1);		2类型坐标轴
 	DefineColor("somehow white", 0.8, 0.8, 0.9);	1类型坐标轴
 * 
 * 
@@ -43,10 +29,12 @@
 
 #include "BasicGraphics.h"
 #include "ReferenceAxis.h"
+#include "BasicAnalysis.h"
 #include "NameLib.h"
 
-#define EPSILON 0.00000001
-
+#define EPSILON   0.00000001
+#define Pi        3.1415926535
+#define LINESIZE  3
 
 // 窗口属性
 static double s_windowWidth;	// 绘图区域宽度
@@ -61,6 +49,7 @@ static double s_axisX = 0, s_axisY = 0;		// 窗口中心点的数值坐标
 static linkedlistADT s_listPoint;	// 点-链表
 static linkedlistADT s_listLine;    // 线-链表
 static linkedlistADT s_listVector;  // 向量-链表
+static linkedlistADT s_listArc;  // 圆-链表
 
 // 画笔状态
 static int    s_penSize;			// 画笔大小
@@ -77,12 +66,16 @@ static bool s_inAxis(double x, double y);
 
 static void s_drawPoint(BG_Point* point);
 static void s_drawLine(BG_Line* line);
+static void s_drawVector(BG_Vector* vect);
+static void s_drawArc(BG_Arc* arc);
 
 // 封装一些方便的函数
-static void s_drawCircle(double x, double y, double r);
+static void s_drawACircle(double x, double y, double r);
 static void s_drawName(double x, double y, string name);
 static void s_drawDouble(double x, double y, double number);
 static void s_drawALine(double x1, double y1, double x2, double y2);
+static BG_Line* s_vectorToLine(BG_Vector* vect);
+static double Radians(double degrees);
 
 // RA会调用的静态函数
 static void s_RA_drawLine(double x, double y, int type, int style);
@@ -106,6 +99,8 @@ void RA_createAxis()
 	double nearY = s_axisCalibration * floor(s_axisY / s_axisCalibration);	// 该坐标是数值坐标
 	
 	int j;
+
+	SetPenSize(1);
 
 	// 浅色part
 
@@ -251,6 +246,11 @@ void RA_move(double x, double y)
 // !!初始化!!
 void BG_init()
 {
+	// 定义一些颜色
+	DefineColor("my Blue", .4, .65, 1);
+	DefineColor("nearly white", 0.9, 0.9, 1);
+	DefineColor("somehow white", 0.8, 0.8, 0.9);
+
 	// 初始化窗口信息
 	s_windowWidth = GetWindowWidth();		// 注意这里，画坐标系的窗口
 	s_windowHeight = GetWindowHeight();		// 不一定是整个窗口范围，这里只是一个示范
@@ -259,6 +259,7 @@ void BG_init()
 	s_listPoint = NewLinkedList();
 	s_listLine = NewLinkedList();
 	s_listVector = NewLinkedList();
+	s_listArc = NewLinkedList();
 
 }
 
@@ -270,6 +271,19 @@ void BG_repaint()
 	{
 		s_drawLine(NodeObj(s_listLine, now));
 	}
+
+	// 弧
+	for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
+	{
+		s_drawArc(NodeObj(s_listArc, now));
+	}
+
+	// 向量
+	for (now = NextNode(s_listVector, s_listVector); now; now = NextNode(s_listVector, now))
+	{
+		s_drawVector(NodeObj(s_listVector, now));
+	}
+
 	// 点
 	for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
 	{
@@ -292,8 +306,8 @@ void BG_addPoint(double x, double y)
 void BG_addLine(double x1, double y1, double x2, double y2, int type)
 {
 	BG_Line* line = New(BG_Line*);
-	line->point[0] = (BG_Point){ x1, y1, "" };
-	line->point[1] = (BG_Point){ x2, y2, "" };
+	line->point[0] = (BG_Point){ "", x1, y1 };
+	line->point[1] = (BG_Point){ "", x2, y2 };
 	line->type = type;
 	line->name = NL_getLowerCase();
 	InsertNode(s_listLine, NULL, line);
@@ -303,8 +317,64 @@ void BG_addLine(double x1, double y1, double x2, double y2, int type)
 
 void BG_addVector(double x1, double y1, double x2, double y2)
 {
+	BG_Vector* vect = New(BG_Vector*);
+	vect->point[0] = (BG_Point){ "", x1, y1 };
+	vect->point[1] = (BG_Point){ "", x2, y2 };
+	vect->name = NL_getLowerCase();
+	InsertNode(s_listVector, NULL, vect);
 
+	s_drawVector(vect);
 }
+
+void BG_addArc(double x, double y, double r, double start, double end)
+{
+	BG_Arc* arc = New(BG_Arc*);
+	arc->point = (BG_Point){ "", x, y };
+	arc->r = r;
+	arc->start = start;
+	arc->end = end;
+	arc->name = NL_getLowerCase();
+	InsertNode(s_listArc, NULL, arc);
+
+	s_drawArc(arc);
+}
+
+void BG_deleteGraphic(string name, int type)
+{
+	int nameType = -1;
+	linkedlistADT head = NULL, now = NULL;
+	switch (type)
+	{
+	case 0:
+		head = s_listPoint;
+		nameType = 1;
+		break;
+	case 1:
+		head = s_listLine;
+		nameType = 0;
+		break;
+	case 2:
+		head = s_listVector;
+		nameType = 0;
+		break;
+	case 3:
+		head = s_listArc;
+		nameType = 0;
+		break;
+	}
+	
+	for (now = NextNode(head, head); now; now = NextNode(head, now))
+	{
+		// 不管什么类型都转成BG_Point，因为它们name成员都是第一个
+		BG_Point* data = NodeObj(head, now);
+		if (StringEqual(data->name, name))
+		{
+			DeleteNode(head, data, StringEqual);
+			NL_deleteName(name, nameType);
+		}
+	}
+}
+
 
 
 double BG_axisToInchX(double x)
@@ -330,6 +400,76 @@ double BG_inchToAxisY(double y)
 	double scale = s_axisCalibration / s_axisInches;
 	return s_axisY + (y - s_windowHeight / 2) * scale;
 }
+
+int BG_getGraphicType(string name)
+{
+	linkedlistADT now;
+
+	// 点
+	for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
+		if (StringEqual(((BG_Point*)NodeObj(s_listPoint, now))->name, name)) return 0;
+
+	// 线
+	for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
+		if (StringEqual(((BG_Line*)NodeObj(s_listLine, now))->name, name)) return 1;
+
+	// 向量
+	for (now = NextNode(s_listVector, s_listVector); now; now = NextNode(s_listVector, now))
+		if (StringEqual(((BG_Vector*)NodeObj(s_listVector, now))->name, name)) return 2;
+
+	// 弧
+	for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
+		if (StringEqual(((BG_Arc*)NodeObj(s_listArc, now))->name, name)) return 3;
+
+	return -1;
+}
+
+string BG_getGraphic(double x, double y)
+{
+	linkedlistADT now;
+
+	// 点
+	for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
+	{
+		BG_Point* point = NodeObj(s_listPoint, now);
+		if (fabs(BG_axisToInchX(point->x) - x) < 0.1 &&
+			fabs(BG_axisToInchY(point->y) - y) < 0.1)
+			return point->name;
+	}
+
+	// 线
+	for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
+	{
+
+	}
+
+	//// 向量
+	//for (now = NextNode(s_listVector, s_listVector); now; now = NextNode(s_listVector, now))
+	//	if (StringEqual(((BG_Vector*)NodeObj(s_listVector, now))->name, name)) return 2;
+
+	//// 弧
+	//for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
+	//	if (StringEqual(((BG_Arc*)NodeObj(s_listArc, now))->name, name)) return 3;
+
+	return "";
+}
+
+
+
+
+
+//----------------------BasicAnalysis.h接口实现------------------
+
+
+double BA_disPointLine(BG_Point* point, BG_Line* line)
+{
+	double x1 = line->point[0].x, x2 = line->point[1].x;
+	double y1 = line->point[0].y, y2 = line->point[1].y;
+	double a = y1 - y2, b = x2 - x1, c = x1 * y2 - x2 * y1;  // 一般式
+	
+	return (a * point->x + b * point->y + c) / sqrt(a * a + b * b);
+}
+
 
 
 
@@ -390,7 +530,7 @@ static void s_drawName(double x, double y, string name)
 static void s_drawPoint(BG_Point* point)
 {
 	if (point == NULL) return;
-	s_savePenStatus();
+	//s_savePenStatus();
 
 	double x = BG_axisToInchX(point->x);
 	double y = BG_axisToInchY(point->y);
@@ -400,16 +540,16 @@ static void s_drawPoint(BG_Point* point)
 	// 画圆
 	StartFilledRegion(1);
 	SetPenColor("my blue");
-	s_drawCircle(x, y, 0.08);
+	s_drawACircle(x, y, 0.08);
 	EndFilledRegion();
 	
 	SetPenColor("black");
-	s_drawCircle(x, y, 0.09);
+	s_drawACircle(x, y, 0.09);
 	
 	// 编号
 	s_drawName(x + 0.1, y + 0.1, point->name);
 
-	s_loadPenStatus();
+	//s_loadPenStatus();
 }
 
 /*
@@ -419,9 +559,9 @@ static void s_drawPoint(BG_Point* point)
 static void s_drawLine(BG_Line* line)
 {
 	if (line == NULL) return;
-	s_savePenStatus();
+	//s_savePenStatus();
 
-	SetPenSize(3);
+	SetPenSize(LINESIZE);
 	SetPenColor("black");
 	
 	double x1 = BG_axisToInchX(line->point[0].x);
@@ -445,14 +585,110 @@ static void s_drawLine(BG_Line* line)
 		s_drawALine(x1, y1, x2, y2);
 	}
 
-	s_loadPenStatus();
+	//s_loadPenStatus();
 }
 
 /*
-* 函数：s_drawCircle
+* 函数：s_drawVector
+* 功能：画一个向量（带箭头的线段）
+*/
+static void s_drawVector(BG_Vector* vect)
+{
+	if (vect == NULL) return;
+	//s_savePenStatus();
+
+	SetPenSize(LINESIZE);
+	SetPenColor("black");
+
+	double x1 = BG_axisToInchX(vect->point[0].x);
+	double y1 = BG_axisToInchY(vect->point[0].y);
+	double x2 = BG_axisToInchX(vect->point[1].x);
+	double y2 = BG_axisToInchY(vect->point[1].y);
+
+	s_drawALine(x1, y1, x2, y2);
+
+	// 画小三角形
+	double k, q;
+	double x3 = 0, x4 = 0, x5 = 0, y3 = 0, y4 = 0, y5 = 0;
+
+	if (fabs(x2 - x1) <= EPSILON)
+	{
+		x4 = x2 - 0.06;	
+		x5 = x2 + 0.06;
+		y4 = y5 = y2 + (y2 > y1 ? -0.2 : 0.2);
+	}
+	else if (fabs(y2 - y1) <= EPSILON)
+	{
+		y4 = y2 - 0.06;
+		y5 = y2 + 0.06;
+		x4 = x5 = x2 + (x2 > x1 ? -0.2 : 0.2);
+	}
+	else
+	{
+		k = (y2 - y1) / (x2 - x1);
+		x3 = x2, y3 = y2, q = sqrt(1 + k * k);
+		x3 += (x2 > x1 ? -1 : 1) * 0.2 / q;
+		y3 += (x2 > x1 ? -1 : 1) * 0.2 * k / q;
+
+		k = (x1 - x2) / (y2 - y1);
+		q = sqrt(1 + k * k);
+		x4 = x3 + 0.06 / q;
+		x5 = x3 - 0.06 / q;
+		y4 = y3 + 0.06 * k / q;
+		y5 = y3 - 0.06 * k / q;
+	}
+
+
+	StartFilledRegion(1);
+
+	s_drawALine(x2, y2, x4, y4);
+	DrawLine(x5 - x4, y5 - y4);
+	DrawLine(x2 - x5, y2 - y5);
+
+	EndFilledRegion();
+	//s_loadPenStatus();
+}
+
+/*
+* 函数：s_drawArc
+* 功能：画一个圆弧
+*/
+static void s_drawArc(BG_Arc* arc)
+{
+	if (arc == NULL) return;
+	SetPenColor("black");
+	SetPenSize(LINESIZE);
+
+	double x = BG_axisToInchX((arc->point).x);
+	double y = BG_axisToInchY((arc->point).y);
+	double r = arc->r / s_axisCalibration * s_axisInches;
+
+	MovePen(x + r * cos(Radians(arc->start)), y + r * sin(Radians(arc->start)));
+	DrawArc(r, arc->start, arc->end - arc->start);
+}
+
+
+
+
+/*
+* 函数：s_vectorToLine
+* 功能：生成一条和向量重合的线段
+*/
+static BG_Line* s_vectorToLine(BG_Vector* vect)
+{
+	BG_Line* line = New(BG_Line*);
+	line->point[0] = vect->point[0];
+	line->point[1] = vect->point[1];
+	line->name = vect->name;
+	line->type = 2;
+	return line;
+}
+
+/*
+* 函数：s_drawACircle
 * 功能：以(x,y)为圆心画半径为r的圆
 */
-static void s_drawCircle(double x, double y, double r)
+static void s_drawACircle(double x, double y, double r)
 {
 	MovePen(x + r, y);
 	DrawArc(r, 0, 360);
@@ -464,6 +700,7 @@ static void s_drawCircle(double x, double y, double r)
 */
 static void s_drawDouble(double x, double y, double number)
 {
+	SetPenColor("black");
 	char str[20];
 	sprintf(str, "%g", number);
 	MovePen(x, y);
@@ -488,7 +725,7 @@ static void s_drawALine(double x1, double y1, double x2, double y2)
 */
 static void s_RA_drawLine(double x, double y, int type, int style)
 {
-	s_savePenStatus();
+	//s_savePenStatus();
 
 	double x1, x2, y1, y2;
 	
@@ -502,7 +739,7 @@ static void s_RA_drawLine(double x, double y, int type, int style)
 		x1 = x2 = x;
 		y1 = 0; y2 = s_windowHeight;
 	}
-	SetPenSize(1);
+
 	switch (style)
 	{
 	case 0:
@@ -528,8 +765,20 @@ static void s_RA_drawLine(double x, double y, int type, int style)
 		s_drawALine(x1, s_windowHeight, x1 - 0.1, s_windowHeight - 0.1);
 		s_drawALine(x1, s_windowHeight, x1 + 0.1, s_windowHeight - 0.1);
 	}
-	s_loadPenStatus();
+	//s_loadPenStatus();
 }
+
+/*
+* 函数：Radians
+* 功能：角度转弧度
+*/
+static double Radians(double degrees)
+{
+	return (degrees * Pi / 180);
+}
+
+
+
 
 /*
 * 函数：s_RA_findX

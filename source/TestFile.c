@@ -4,6 +4,7 @@
 
 #include "BasicGraphics.h"
 #include "ReferenceAxis.h"
+#include "BasicAnalysis.h"
 #include "NameLib.h"
 #include "SimpleGUI.h"
 
@@ -60,6 +61,10 @@ void MouseEventProcess(int x, int y, int key, int event)
 				RA_move(dx - lastDx, dy - lastDy);
 			Display();
 		}
+		else
+		{
+		//	printf("%s\n", BG_getGraphic(dx, dy));	// 检验是否可以get到鼠标附近的图形
+		}
 		break;
 
 	default:
@@ -76,10 +81,10 @@ void Main()
 	InitGraphics();
 	BG_init();
 
+	InitConsole();
+
 	registerMouseEvent(MouseEventProcess);
 
-	
-	
 	//-----------------------一些测试----------------------
 	RA_createAxis();
 	
@@ -94,12 +99,19 @@ void Main()
 	BG_addPoint(BG_inchToAxisX(2), BG_inchToAxisY(3));	// 加个实际坐标为(2, 3)的点
 	BG_addPoint(1, 1);  // 寄一个坐标为(1, 1)的点
 
-	pointMode = 1;	// 右键开关此模式
+	pointMode = 0;
 
 
 	BG_addLine(2, 2, 3, 4, 0);	 // 直线
 	BG_addLine(2, 2, -1, 5, 1);   // 射线
-	BG_addLine(-1, 0, 0, 2, 2);  // 线段
+	BG_addLine(-1, 2, 0, 2, 2);  // 线段
 	BG_addPoint(2, 2);
+
+	BG_addArc(1, 1, 2, 30, 330);
+
+	BG_addVector(0, 0, 1, -2);
+	BG_addVector(0, 0, -3, -3);
+	BG_addVector(0, 0, -3, 0);
+	BG_addVector(0, 0, 0, -3);
 
 }

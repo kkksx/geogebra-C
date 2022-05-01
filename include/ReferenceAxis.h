@@ -5,10 +5,8 @@
 * 文件：ReferenceAxis.h
 * 作者：kkksx
 * 
-* 功能：创建坐标轴
+* 功能：创建坐标轴，支持移动和缩放
 */
-
-
 
 /*
 * 接口：RA_createAxis

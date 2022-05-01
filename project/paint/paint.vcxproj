@@ -31,6 +31,7 @@
     <ClCompile Include="..\..\source\TestFile.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\BasicAnalysis.h" />
     <ClInclude Include="..\..\include\BasicGraphics.h" />
     <ClInclude Include="..\..\include\NameLib.h" />
     <ClInclude Include="..\..\include\ReferenceAxis.h" />

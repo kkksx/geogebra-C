@@ -1724,10 +1724,6 @@ static void InitColors(void)
     DefineColor("Violet", .93, .5, .93);
     DefineColor("Magenta", 1, 0, 1);
     DefineColor("Cyan", 0, 1, 1);
-
-    DefineColor("my Blue", .4, .65, 1);
-    DefineColor("nearly white", 0.95, 0.95, 1); 
-    DefineColor("somehow white", 0.8, 0.8, 0.9);
 }
 
 /*
