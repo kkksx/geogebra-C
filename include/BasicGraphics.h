@@ -75,30 +75,33 @@ void BG_init();
 void BG_repaint();
 
 
+
+
 /*
 * 接口：BG_addPoint
 * 功能：加一个坐标为(x, y)的点
 *		其中x和y是数值坐标
 */
-void BG_addPoint(double x, double y);
+BG_Point* BG_addPoint(double x, double y);
 
 /*
 * 接口：BG_addLine
 * 功能：将给定的两个点连线，以此创建一条线，并指定类型
 */
-void BG_addLine(double x1, double y1, double x2, double y2, int type);
+BG_Line* BG_addLine(double x1, double y1, double x2, double y2, int type);
 
 /*
 * 接口：BG_addVector
 * 功能：构造一个从a到b的向量
 */
-void BG_addVector(double x1, double y1, double x2, double y2);
+BG_Vector* BG_addVector(double x1, double y1, double x2, double y2);
 
 /*
 * 接口：BG_addArc
 * 功能：构造一个圆心为(x,y)，半径为r，起点角度为start，终点角度为end的圆弧
 */
-void BG_addArc(double x, double y, double r, double start, double end);
+BG_Arc* BG_addArc(double x, double y, double r, double start, double end);
+
 
 
 
@@ -115,6 +118,7 @@ double BG_axisToInchY(double y);
 */
 double BG_inchToAxisX(double x);
 double BG_inchToAxisY(double y);
+
 
 
 
@@ -146,6 +150,7 @@ int BG_getGraphicType(string name);
 *		类型应该由BG_getGraphicType确定
 */
 void* BG_getGraphic(string name);
+
 
 
 

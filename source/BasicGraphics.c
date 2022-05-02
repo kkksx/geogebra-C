@@ -255,7 +255,7 @@ void BG_init()
 
 	// 初始化窗口信息
 	s_windowWidth = GetWindowWidth();		// 注意这里，画坐标系的窗口
-	s_windowHeight = GetWindowHeight();		// 不一定是整个窗口范围，这里只是一个示范
+	s_windowHeight = GetWindowHeight() - 1;		// 不一定是整个窗口范围，这里只是一个示范
 
 	// 初始化链表
 	s_listPoint = NewLinkedList();
@@ -293,7 +293,7 @@ void BG_repaint()
 	}
 }
 
-void BG_addPoint(double x, double y)
+BG_Point* BG_addPoint(double x, double y)
 {
 	// 加一个点进入链表
 	BG_Point* point = New(BG_Point*);
@@ -303,9 +303,10 @@ void BG_addPoint(double x, double y)
 
 	// 画出这个点
 	s_drawPoint(point);
+	return point;
 }
 
-void BG_addLine(double x1, double y1, double x2, double y2, int type)
+BG_Line* BG_addLine(double x1, double y1, double x2, double y2, int type)
 {
 	BG_Line* line = New(BG_Line*);
 	line->point[0] = (BG_Point){ "", x1, y1 };
@@ -315,9 +316,10 @@ void BG_addLine(double x1, double y1, double x2, double y2, int type)
 	InsertNode(s_listLine, NULL, line);
 
 	s_drawLine(line);
+	return line;
 }
 
-void BG_addVector(double x1, double y1, double x2, double y2)
+BG_Vector* BG_addVector(double x1, double y1, double x2, double y2)
 {
 	BG_Vector* vect = New(BG_Vector*);
 	vect->point[0] = (BG_Point){ "", x1, y1 };
@@ -326,9 +328,10 @@ void BG_addVector(double x1, double y1, double x2, double y2)
 	InsertNode(s_listVector, NULL, vect);
 
 	s_drawVector(vect);
+	return vect;
 }
 
-void BG_addArc(double x, double y, double r, double start, double end)
+BG_Arc* BG_addArc(double x, double y, double r, double start, double end)
 {
 	BG_Arc* arc = New(BG_Arc*);
 	arc->point = (BG_Point){ "", x, y };
@@ -339,6 +342,7 @@ void BG_addArc(double x, double y, double r, double start, double end)
 	InsertNode(s_listArc, NULL, arc);
 
 	s_drawArc(arc);
+	return arc;
 }
 
 
@@ -812,6 +816,9 @@ static void s_drawALine(double x1, double y1, double x2, double y2)
 	DrawLine(x2 - x1, y2 - y1);
 }
 
+
+
+
 /*
 * 函数：s_RA_drawLine
 * 功能：在实际坐标(x,y)画一条直线
@@ -862,9 +869,6 @@ static void s_RA_drawLine(double x, double y, int type, int style)
 	}
 	//s_loadPenStatus();
 }
-
-
-
 
 /*
 * 函数：s_RA_findX
