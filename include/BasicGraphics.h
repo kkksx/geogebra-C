@@ -8,7 +8,7 @@
 * 
 * 功能：包含与具体图形有关的接口和数据结构
 * 	
-*	0:点，1:直线，2:向量，3:弧
+*	图形种类：0:点，1:直线，2:向量，3:弧
 * 
 * 
 */
@@ -35,7 +35,7 @@ typedef struct
 {
 	string	 name;		 // 命名
 	BG_Point point[2];   // 端点
-	int		 type;       // 0线段、1射线、2直线
+	int		 type;       // 0直线、1射线、2线段
 }BG_Line;
 
 
@@ -100,12 +100,6 @@ void BG_addVector(double x1, double y1, double x2, double y2);
 */
 void BG_addArc(double x, double y, double r, double start, double end);
 
-/*
-* 接口：BG_deleteGraphic
-* 功能：按照“名字”删除一个图形，依据type区别其类型
-*		图形会在下次刷新时被删除
-*/
-void BG_deleteGraphic(string name, int type);
 
 
 /*
@@ -122,6 +116,23 @@ double BG_axisToInchY(double y);
 double BG_inchToAxisX(double x);
 double BG_inchToAxisY(double y);
 
+
+
+/*
+* 接口：BG_deleteGraphic
+* 功能：按照“名字”删除一个图形
+*		图形会在下次刷新时被删除
+*/
+void BG_deleteGraphic(string name);
+
+/*
+* 接口：BG_getGraphicName
+* 功能：获取鼠标附近的一个图形，返回其名字
+*		输入为鼠标所在的英寸坐标
+*		返回空字符串表示没找到
+*/
+string BG_getGraphicName(double x, double y);
+
 /*
 * 接口：BG_getGraphicType
 * 功能：获得一个图形的种类
@@ -131,11 +142,13 @@ int BG_getGraphicType(string name);
 
 /*
 * 接口：BG_getGraphic
-* 功能：获取鼠标附近的一个图形，返回其名字
-*		输入为鼠标所在的英寸坐标		
-*		返回空字符串表示没找到
+* 功能：按照一个名字获取对应的图形，返回其指针
+*		类型应该由BG_getGraphicType确定
 */
-string BG_getGraphic(double x, double y);
+void* BG_getGraphic(string name);
+
+
+
 
 
 

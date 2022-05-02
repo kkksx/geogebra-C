@@ -10,7 +10,7 @@
 
 #include <Windows.h>
 #include <WinUser.h>
-#include <sysinfoapi.h>
+
 
 static bool pointMode = 0;	// 鼠标左键加点模式
 static bool mouseDown = 0;	// 鼠标左键按下，仅非加点模式
@@ -36,7 +36,17 @@ void MouseEventProcess(int x, int y, int key, int event)
 			BG_addPoint(BG_inchToAxisX(dx), BG_inchToAxisY(dy));
 		else if (key == LEFT_BUTTON) mouseDown = 1;
 		
-		if (key == RIGHT_BUTTON) pointMode ^= 1;
+		if (key == RIGHT_BUTTON)
+		{
+			pointMode ^= 1;
+			string name = BG_getGraphicName(dx, dy);
+			if (name != "")
+			{
+				BG_deleteGraphic(name);
+				printf("%lf %lf %s\n", dx, dy, name);
+				Display();
+			}
+		}
 
 		break;
 
@@ -92,10 +102,6 @@ void Main()
 	GUI_addButton(4, 2, 1, 1, "../resource/Cbitmap/point.bmp");
 	GUI_addButton(6, 2, 1, 1, "../resource/Cbitmap/line.bmp");
 
-	SetPenSize(3);
-	MovePen(2, 5);
-	DrawLine(1, 1);
-
 	BG_addPoint(BG_inchToAxisX(2), BG_inchToAxisY(3));	// 加个实际坐标为(2, 3)的点
 	BG_addPoint(1, 1);  // 寄一个坐标为(1, 1)的点
 
@@ -113,5 +119,7 @@ void Main()
 	BG_addVector(0, 0, -3, -3);
 	BG_addVector(0, 0, -3, 0);
 	BG_addVector(0, 0, 0, -3);
+
+	printf("%lf\n", BA_disPointLine(BG_getGraphic("A"), BG_getGraphic("b")));  // A点到b线的距离
 
 }

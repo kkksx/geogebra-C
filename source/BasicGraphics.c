@@ -33,7 +33,7 @@
 #include "NameLib.h"
 
 #define EPSILON   0.00000001
-#define Pi        3.1415926535
+#define PI        3.1415926535
 #define LINESIZE  3
 
 // 窗口属性
@@ -75,14 +75,16 @@ static void s_drawName(double x, double y, string name);
 static void s_drawDouble(double x, double y, double number);
 static void s_drawALine(double x1, double y1, double x2, double y2);
 static BG_Line* s_vectorToLine(BG_Vector* vect);
-static double Radians(double degrees);
 
 // RA会调用的静态函数
 static void s_RA_drawLine(double x, double y, int type, int style);
 static double s_RA_findX();
 static double s_RA_findY();
 
-
+// 一些数学函数
+static double s_Radians(double degrees);
+static double s_Degrees(double radians);
+static double s_DotProduct(double x1, double y1, double x2, double y2);
 
 
 
@@ -339,42 +341,6 @@ void BG_addArc(double x, double y, double r, double start, double end)
 	s_drawArc(arc);
 }
 
-void BG_deleteGraphic(string name, int type)
-{
-	int nameType = -1;
-	linkedlistADT head = NULL, now = NULL;
-	switch (type)
-	{
-	case 0:
-		head = s_listPoint;
-		nameType = 1;
-		break;
-	case 1:
-		head = s_listLine;
-		nameType = 0;
-		break;
-	case 2:
-		head = s_listVector;
-		nameType = 0;
-		break;
-	case 3:
-		head = s_listArc;
-		nameType = 0;
-		break;
-	}
-	
-	for (now = NextNode(head, head); now; now = NextNode(head, now))
-	{
-		// 不管什么类型都转成BG_Point，因为它们name成员都是第一个
-		BG_Point* data = NodeObj(head, now);
-		if (StringEqual(data->name, name))
-		{
-			DeleteNode(head, data, StringEqual);
-			NL_deleteName(name, nameType);
-		}
-	}
-}
-
 
 
 double BG_axisToInchX(double x)
@@ -401,6 +367,134 @@ double BG_inchToAxisY(double y)
 	return s_axisY + (y - s_windowHeight / 2) * scale;
 }
 
+
+
+void BG_deleteGraphic(string name)
+{
+	int nameType = -1;
+	int type = BG_getGraphicType(name);
+	linkedlistADT head = NULL, now = NULL;
+	switch (type)
+	{
+	case 0:
+		head = s_listPoint;
+		nameType = 1;
+		break;
+	case 1:
+		head = s_listLine;
+		nameType = 0;
+		break;
+	case 2:
+		head = s_listVector;
+		nameType = 0;
+		break;
+	case 3:
+		head = s_listArc;
+		nameType = 0;
+		break;
+	}
+
+	for (now = NextNode(head, head); now; now = NextNode(head, now))
+	{
+		// 不管什么类型都转成BG_Point，因为它们name成员都是第一个
+		BG_Point* data = NodeObj(head, now);
+		if (StringEqual(data->name, name))
+		{
+			DeleteNode(head, data, StringEqual);
+			NL_deleteName(name, nameType);
+		}
+	}
+}
+
+string BG_getGraphicName(double x, double y)
+{
+	linkedlistADT now;
+
+	BG_Point* pt = New(BG_Point*);
+	pt->x = BG_inchToAxisX(x);
+	pt->y = BG_inchToAxisY(y);
+
+	double range = 0.1 * s_axisCalibration / s_axisInches;  // 鼠标点击判定圆形区域0.1英寸
+
+	// 点
+	for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
+	{
+		BG_Point* point = NodeObj(s_listPoint, now);
+		if (BA_disPointPoint(pt, point) < range) return point->name;
+	}
+
+	// 线
+	for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
+	{
+		BG_Line* line = NodeObj(s_listLine, now);
+		BG_Point* point[2] = { &line->point[0], &line->point[1] };
+
+		double dis = BA_disPointLine(pt, line);
+		if (dis >= range) continue;
+
+		if (line->type == 0) return line->name;
+		else if (line->type == 1)	// 射线
+		{
+			if (s_DotProduct(point[1]->x - point[0]->x, point[1]->y - point[0]->y,
+				pt->x - point[0]->x, pt->y - point[0]->y) > 0) return line->name;
+			else if (BA_disPointPoint(pt, point[0]) < range) return line->name;
+		}
+		else if (line->type == 2)	// 线段需判断垂点是否落在线段上
+		{
+			if (BA_disPointPoint(pt, point[0]) < range) return line->name;
+			if (BA_disPointPoint(pt, point[1]) < range) return line->name;
+			if (s_DotProduct(point[1]->x - point[0]->x, point[1]->y - point[0]->y,
+				pt->x - point[0]->x, pt->y - point[0]->y) > 0 && 
+				s_DotProduct(point[0]->x - point[1]->x, point[0]->y - point[1]->y,
+				pt->x - point[1]->x, pt->y - point[1]->y) > 0) 
+					return line->name;
+		}
+	}
+
+	// 向量
+	for (now = NextNode(s_listVector, s_listVector); now; now = NextNode(s_listVector, now))
+	{
+		BG_Vector* vect = NodeObj(s_listVector, now);
+		BG_Point* point[2] = { &vect->point[0], &vect->point[1] };
+
+		double dis = BA_disPointLine(pt, (BG_Line*)vect);	// 此处强转的前提是两者前几个元素相同
+		if (dis >= range) continue;
+
+		if (BA_disPointPoint(pt, point[0]) < range) return vect->name;
+		if (BA_disPointPoint(pt, point[1]) < range) return vect->name;
+		if (s_DotProduct(point[1]->x - point[0]->x, point[1]->y - point[0]->y,
+			pt->x - point[0]->x, pt->y - point[0]->y) > 0 &&
+			s_DotProduct(point[0]->x - point[1]->x, point[0]->y - point[1]->y,
+				pt->x - point[1]->x, pt->y - point[1]->y) > 0)
+			return vect->name;
+	}
+
+	// 弧
+	for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
+	{
+		BG_Arc* arc = NodeObj(s_listArc, now);
+		double dx = pt->x - arc->point.x;
+		double dy = pt->y - arc->point.y;
+
+		if (fabs(BA_disPointPoint(pt, &arc->point) - arc->r) >= range) continue;
+
+		double angle;
+		if (fabs(dx) <= EPSILON) angle = PI / 2;
+		else
+		{
+			angle = atan(dy / dx);
+			if (dx < 0) angle += PI;
+			else if (angle < 0) angle += PI * 2;
+		}
+		angle = s_Degrees(angle);
+		if (arc->start - EPSILON <= angle && angle <= arc->end + EPSILON) return arc->name;
+	}
+	
+	FreeBlock(pt);
+	
+	return "";
+}
+
 int BG_getGraphicType(string name)
 {
 	linkedlistADT now;
@@ -424,36 +518,28 @@ int BG_getGraphicType(string name)
 	return -1;
 }
 
-string BG_getGraphic(double x, double y)
+void* BG_getGraphic(string name)
 {
 	linkedlistADT now;
 
 	// 点
 	for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
-	{
-		BG_Point* point = NodeObj(s_listPoint, now);
-		if (fabs(BG_axisToInchX(point->x) - x) < 0.1 &&
-			fabs(BG_axisToInchY(point->y) - y) < 0.1)
-			return point->name;
-	}
+		if (StringEqual(((BG_Point*)NodeObj(s_listPoint, now))->name, name)) return now->dataptr;
 
 	// 线
 	for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
-	{
+		if (StringEqual(((BG_Line*)NodeObj(s_listLine, now))->name, name)) return now->dataptr;
 
-	}
+	// 向量
+	for (now = NextNode(s_listVector, s_listVector); now; now = NextNode(s_listVector, now))
+		if (StringEqual(((BG_Vector*)NodeObj(s_listVector, now))->name, name)) return now->dataptr;
 
-	//// 向量
-	//for (now = NextNode(s_listVector, s_listVector); now; now = NextNode(s_listVector, now))
-	//	if (StringEqual(((BG_Vector*)NodeObj(s_listVector, now))->name, name)) return 2;
+	// 弧
+	for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
+		if (StringEqual(((BG_Arc*)NodeObj(s_listArc, now))->name, name)) return now->dataptr;
 
-	//// 弧
-	//for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
-	//	if (StringEqual(((BG_Arc*)NodeObj(s_listArc, now))->name, name)) return 3;
-
-	return "";
+	return NULL;
 }
-
 
 
 
@@ -467,10 +553,13 @@ double BA_disPointLine(BG_Point* point, BG_Line* line)
 	double y1 = line->point[0].y, y2 = line->point[1].y;
 	double a = y1 - y2, b = x2 - x1, c = x1 * y2 - x2 * y1;  // 一般式
 	
-	return (a * point->x + b * point->y + c) / sqrt(a * a + b * b);
+	return fabs(a * point->x + b * point->y + c) / sqrt(a * a + b * b);
 }
 
-
+double BA_disPointPoint(BG_Point* point1, BG_Point* point2)
+{
+	return sqrt(pow(point1->x - point2->x, 2) + pow(point1->y - point2->y, 2));
+}
 
 
 
@@ -585,6 +674,7 @@ static void s_drawLine(BG_Line* line)
 		s_drawALine(x1, y1, x2, y2);
 	}
 
+	s_drawName((x1 + x2) / 2 + 0.1, (y1 + y2) / 2 + 0.1, line->name);
 	//s_loadPenStatus();
 }
 
@@ -646,6 +736,8 @@ static void s_drawVector(BG_Vector* vect)
 	DrawLine(x2 - x5, y2 - y5);
 
 	EndFilledRegion();
+
+	s_drawName((x1 + x2) / 2 + 0.1, (y1 + y2) / 2 + 0.1, vect->name);
 	//s_loadPenStatus();
 }
 
@@ -663,8 +755,11 @@ static void s_drawArc(BG_Arc* arc)
 	double y = BG_axisToInchY((arc->point).y);
 	double r = arc->r / s_axisCalibration * s_axisInches;
 
-	MovePen(x + r * cos(Radians(arc->start)), y + r * sin(Radians(arc->start)));
+	MovePen(x + r * cos(s_Radians(arc->start)), y + r * sin(s_Radians(arc->start)));
 	DrawArc(r, arc->start, arc->end - arc->start);
+
+	s_drawName(x + cos(s_Radians((arc->start + arc->end) / 2)) * (arc->r - 0.1),
+			   y + sin(s_Radians((arc->start + arc->end) / 2)) * (arc->r - 0.1), arc->name);
 }
 
 
@@ -768,15 +863,6 @@ static void s_RA_drawLine(double x, double y, int type, int style)
 	//s_loadPenStatus();
 }
 
-/*
-* 函数：Radians
-* 功能：角度转弧度
-*/
-static double Radians(double degrees)
-{
-	return (degrees * Pi / 180);
-}
-
 
 
 
@@ -811,10 +897,32 @@ static double s_RA_findY()
 
 
 
+/*
+* 函数：s_Radians
+* 功能：角度转弧度
+*/
+static double s_Radians(double degrees)
+{
+	return (degrees * PI / 180);
+}
 
+/*
+* 函数：s_Degrees
+* 功能：弧度转角度
+*/
+static double s_Degrees(double radians)
+{
+	return (radians * 180 / PI);
+}
 
-
-
+/*
+* 函数：s_DotProduct
+* 功能：点乘
+*/
+static double s_DotProduct(double x1, double y1, double x2, double y2)
+{
+	return x1 * x2 + y1 * y2;
+}
 
 
 

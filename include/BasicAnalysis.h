@@ -21,7 +21,11 @@
 */
 double BA_disPointLine(BG_Point* point, BG_Line* line);
 
-
+/*
+* 接口：BA_disPointPoint
+* 功能：两点之间的距离
+*/
+double BA_disPointPoint(BG_Point* point1, BG_Point* point2);
 
 
 #endif // !_BA_H
