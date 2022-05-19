@@ -2,10 +2,11 @@
 #define _SIMPLE_GUI_H
 
 /*
+* 
 * 功能：资源加载
+*	由graphics.c实现
+*
 */
-
-void GUI_addBitmap();
 
 /*
 * 接口：GUI_addButton
@@ -19,6 +20,18 @@ void GUI_addBitmap();
 void GUI_addButton(double x, double y, double w, double h, char* file);
 
 
+/*
+* GUI_addBitmap
+* 功能：添加一张bmp位图，参数同GUI_addButton
+*/
+void GUI_addBitmap(double x, double y, double w, double h, char* file);
+
+
+/*
+* 函数：GUI_update
+* 功能：更新窗口，在display里面最后调用
+*/
+inline void GUI_update();
 
 
 #endif

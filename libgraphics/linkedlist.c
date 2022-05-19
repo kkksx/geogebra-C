@@ -193,3 +193,42 @@ void *NodeObj(linkedlistADT head, linkedlistADT nodeptr)
 	if (nodeptr != NULL) return nodeptr->dataptr;
 	return NULL;
 }
+
+
+/*
+* 函数：DeleteLastNode
+* 功能：删除链表的最后一项，并返回这一项
+*/
+linkedlistADT DeleteLastNode(linkedlistADT head)
+{
+	linkedlistADT now = head;
+	if (now == NULL || now->next == NULL) return NULL;
+	for (; now; now = NextNode(head, now))
+	{
+		if (now->next->next == NULL)
+		{
+			linkedlistADT temp = now->next;
+			now->next = NULL;
+			return temp;
+		}
+	}
+	return NULL;
+}
+
+/*
+* 函数：FindLastNode
+* 功能：搜索并返回链表最后一项
+*/
+linkedlistADT FindLastNode(linkedlistADT head)
+{
+	if (head == NULL) return NULL;
+	linkedlistADT now = NextNode(head, head);
+	for (; now; now = NextNode(head, now))
+	{
+		if (now->next == NULL)
+		{
+			return now;
+		}
+	}
+	return NULL;
+}

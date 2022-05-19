@@ -4,9 +4,11 @@
 * 实现了
 *	BasicGraphics.h
 *	ReferenceAxis.h
+*	BasicAnalysis.h
+*	AdvanceGraphics.h
 * 中定义的接口
 * 
-* 此模块影响的范围仅限于绘图区域
+* 此模块影响绘图区域
 * 
 * 数值距离：以数字形式写出来的距离，即在坐标轴内的距离
 * 实际距离：占窗口的英寸
@@ -25,16 +27,22 @@
 #include "extgraph.h"
 #include "genlib.h"
 #include "strlib.h"
+#include "boolean.h"
 #include "linkedlist.h"
 
 #include "BasicGraphics.h"
 #include "ReferenceAxis.h"
+#include "AdvanceGraphics.h"
 #include "BasicAnalysis.h"
 #include "NameLib.h"
 
-#define EPSILON   0.00000001
-#define PI        3.1415926535
-#define LINESIZE  3
+#define EPSILON   0.00000001		// double精度
+#define PI        3.1415926535		// 圆周率π
+#define INF		  1145141919.810	// 极大值
+#define LINESIZE  3					// 线的粗细
+
+#define Max(x, y) (((x) > (y)) ? (x) : (y))
+#define Min(x, y) (((x) < (y)) ? (x) : (y))
 
 // 窗口属性
 static double s_windowWidth;	// 绘图区域宽度
@@ -46,10 +54,14 @@ static double s_axisInches = 1;				// 原点到第一条刻度线的实际距离，应该保证该值
 static double s_axisX = 0, s_axisY = 0;		// 窗口中心点的数值坐标
 
 // 记录图像，在链表中==已经被绘出
-static linkedlistADT s_listPoint;	// 点-链表
-static linkedlistADT s_listLine;    // 线-链表
-static linkedlistADT s_listVector;  // 向量-链表
-static linkedlistADT s_listArc;  // 圆-链表
+static linkedlistADT s_listPoint;		 // 点-链表
+static linkedlistADT s_listLine;		 // 线-链表
+static linkedlistADT s_listVector;		 // 向量-链表
+static linkedlistADT s_listArc;			 // 弧-链表
+static linkedlistADT s_listPolygon;		 // 多边形-链表
+static linkedlistADT s_listEllipse;		 // 椭圆-链表
+static linkedlistADT s_listHyperbola;    // 双曲线-链表
+static linkedlistADT s_listParabola;     // 抛物线-链表
 
 // 画笔状态
 static int    s_penSize;			// 画笔大小
@@ -68,12 +80,17 @@ static void s_drawPoint(BG_Point* point);
 static void s_drawLine(BG_Line* line);
 static void s_drawVector(BG_Vector* vect);
 static void s_drawArc(BG_Arc* arc);
+static void s_drawPolygon(AG_Polygon* polygon);
+static void s_drawEllipse(AG_Ellipse* ellipse);
+static void s_drawHyperbola(AG_Hyperbola* hyperbola);
+static void s_drawParabola(AG_Parabola* parabola);
 
 // 封装一些方便的函数
 static void s_drawACircle(double x, double y, double r);
 static void s_drawName(double x, double y, string name);
 static void s_drawDouble(double x, double y, double number);
 static void s_drawALine(double x1, double y1, double x2, double y2);
+static void s_drawAllLine(BG_Point* point, int n, bool closed);
 static BG_Line* s_vectorToLine(BG_Vector* vect);
 
 // RA会调用的静态函数
@@ -262,12 +279,22 @@ void BG_init()
 	s_listLine = NewLinkedList();
 	s_listVector = NewLinkedList();
 	s_listArc = NewLinkedList();
-
+	s_listPolygon = NewLinkedList();
+	s_listEllipse = NewLinkedList();
+	s_listHyperbola = NewLinkedList();
+	s_listParabola = NewLinkedList();
 }
 
 void BG_repaint()
 {
 	linkedlistADT now;
+
+	// 多边形
+	for (now = NextNode(s_listPolygon, s_listPolygon); now; now = NextNode(s_listPolygon, now))
+	{
+		s_drawPolygon(NodeObj(s_listPolygon, now));
+	}
+
 	// 线
 	for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
 	{
@@ -278,6 +305,24 @@ void BG_repaint()
 	for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
 	{
 		s_drawArc(NodeObj(s_listArc, now));
+	}
+
+	// 椭圆
+	for (now = NextNode(s_listEllipse, s_listEllipse); now; now = NextNode(s_listEllipse, now))
+	{
+		s_drawEllipse(NodeObj(s_listEllipse, now));
+	}
+
+	// 双曲线
+	for (now = NextNode(s_listHyperbola, s_listHyperbola); now; now = NextNode(s_listHyperbola, now))
+	{
+		s_drawHyperbola(NodeObj(s_listHyperbola, now));
+	}
+
+	// 抛物线
+	for (now = NextNode(s_listParabola, s_listParabola); now; now = NextNode(s_listParabola, now))
+	{
+		s_drawParabola(NodeObj(s_listParabola, now));
 	}
 
 	// 向量
@@ -548,7 +593,105 @@ void* BG_getGraphic(string name)
 
 
 
-//----------------------BasicAnalysis.h接口实现------------------
+//----------------------AdvanceGraphics.h接口实现---------------------
+
+
+AG_Polygon* AG_addPolygon(BG_Point** vertice, int n, string color)
+{
+	AG_Polygon* polygon = New(AG_Polygon*);
+	polygon->vertice = NewLinkedList();
+	polygon->edge = NewLinkedList();
+	polygon->color = color;
+	polygon->closed = 0;
+
+	int i;
+	for (i = 0; i < n; ++i)
+	{
+		// 加一个点进入链表
+		BG_Point* point = vertice[i];
+		InsertNode(polygon->vertice, NULL, point);
+	
+		if (i + 1 == n) break;
+		BG_Point* point2 = vertice[i + 1];
+		InsertNode(polygon->edge, NULL,
+			BG_addLine(point->x, point->y, point2->x, point2->y, 2));
+	}
+
+	// 插入该多边形并绘出
+	InsertNode(s_listPolygon, NULL, polygon);
+	s_drawPolygon(polygon);
+	return polygon;
+}
+
+AG_Polygon* AG_addPoint(AG_Polygon* polygon, BG_Point* point)
+{
+	if (polygon->vertice->next == NULL)  // 一个点都没有
+	{
+		InsertNode(polygon->vertice, NULL, point);
+		return polygon;
+	}
+	// 加一条边，一个点
+	BG_Point* las = FindLastNode(polygon->vertice)->dataptr;
+	InsertNode(polygon->edge, NULL,
+		BG_addLine(las->x, las->y, point->x, point->y, 2));
+	InsertNode(polygon->vertice, NULL, point);
+	
+	return polygon;
+}
+
+bool AG_switchClose(AG_Polygon* polygon)
+{
+	polygon->closed ^= 1;
+	return polygon->closed;
+}
+
+
+
+AG_Ellipse* AG_addEllipse(BG_Point point, BG_Point direction, double a, double b)
+{
+	AG_Ellipse* ellipse = New(AG_Ellipse*);
+	ellipse->point = point;
+	ellipse->direction = direction;
+	ellipse->a = a;
+	ellipse->b = b;
+
+	InsertNode(s_listEllipse, NULL, ellipse);
+	s_drawEllipse(ellipse);
+
+	return ellipse;
+}
+
+AG_Hyperbola* AG_addHyperbola(BG_Point point, BG_Point direction, double a, double b)
+{
+	AG_Hyperbola* hyperbola = New(AG_Hyperbola*);
+	hyperbola->point = point;
+	hyperbola->direction = direction;
+	hyperbola->a = a;
+	hyperbola ->b = b;
+
+	InsertNode(s_listHyperbola, NULL, hyperbola);
+	s_drawHyperbola(hyperbola);
+
+	return hyperbola;
+}
+
+AG_Parabola* AG_addParabola(BG_Point point, BG_Point direction, double f)
+{
+	AG_Parabola* parabola = New(AG_Parabola*);
+	parabola->point = point;
+	parabola->direction = direction;
+	parabola->f = f;
+
+	InsertNode(s_listParabola, NULL, parabola);
+	s_drawParabola(parabola);
+
+	return parabola;
+}
+
+
+
+
+//----------------------BasicAnalysis.h接口实现-----------------------
 
 
 double BA_disPointLine(BG_Point* point, BG_Line* line)
@@ -565,6 +708,13 @@ double BA_disPointPoint(BG_Point* point1, BG_Point* point2)
 	return sqrt(pow(point1->x - point2->x, 2) + pow(point1->y - point2->y, 2));
 }
 
+BG_Point BA_midPoint(BG_Point* point1, BG_Point* point2)
+{
+	BG_Point mid;
+	mid.x = (point1->x + point2->x) / 2;
+	mid.y = (point1->y + point2->y) / 2;
+	return mid;
+}
 
 
 //------------------------静态函数实现----------------------------
@@ -661,7 +811,7 @@ static void s_drawLine(BG_Line* line)
 	double y1 = BG_axisToInchY(line->point[0].y);
 	double x2 = BG_axisToInchX(line->point[1].x);
 	double y2 = BG_axisToInchY(line->point[1].y);
-
+	
 	switch (line->type)
 	{
 	case 0:   // 直线 
@@ -762,11 +912,192 @@ static void s_drawArc(BG_Arc* arc)
 	MovePen(x + r * cos(s_Radians(arc->start)), y + r * sin(s_Radians(arc->start)));
 	DrawArc(r, arc->start, arc->end - arc->start);
 
-	s_drawName(x + cos(s_Radians((arc->start + arc->end) / 2)) * (arc->r - 0.1),
-			   y + sin(s_Radians((arc->start + arc->end) / 2)) * (arc->r - 0.1), arc->name);
+	s_drawName(x + cos(s_Radians((arc->start + arc->end) / 2)) * (r - 0.1),
+			   y + sin(s_Radians((arc->start + arc->end) / 2)) * (r - 0.1), arc->name);
 }
 
+/*
+* 函数：s_drawPolygon
+* 功能：画一个多边形，如果要改透明度，只需要改这里就行
+*/
+static void s_drawPolygon(AG_Polygon* polygon)
+{
+	if (polygon == NULL || polygon->vertice == NULL) return;
 
+	linkedlistADT lasPoint = NextNode(polygon->vertice, polygon->vertice);
+	linkedlistADT nowPoint = NextNode(polygon->vertice, lasPoint);
+	BG_Point *a, *b;
+
+	if (nowPoint == NULL) return;
+
+	SetPenSize(LINESIZE);
+	SetPenColor(polygon->color);
+
+	a = NodeObj(NULL, lasPoint);  // 第一个点
+	MovePen(BG_axisToInchX(a->x), BG_axisToInchY(a->y));
+	StartFilledRegion(1);
+
+	while (nowPoint != NULL)
+	{
+		a = NodeObj(NULL, lasPoint);
+		b = NodeObj(NULL, nowPoint);
+
+		DrawLine(BG_axisToInchX(b->x) - BG_axisToInchX(a->x), 
+				 BG_axisToInchY(b->y) - BG_axisToInchY(a->y));
+
+		lasPoint = nowPoint;
+		nowPoint = NextNode(polygon->vertice, nowPoint);
+	}
+
+	// 最后一条闭合线
+	if (polygon->closed)
+	{
+		a = NodeObj(NULL, lasPoint);
+		b = NodeObj(NULL, NextNode(polygon->vertice, polygon->vertice));
+		DrawLine(BG_axisToInchX(b->x) - BG_axisToInchX(a->x),
+				 BG_axisToInchY(b->y) - BG_axisToInchY(a->y));
+	}
+
+	EndFilledRegion();
+
+
+	// 重新画点，保证点在区域上面
+	nowPoint = NextNode(polygon->vertice, polygon->vertice);
+	for (; nowPoint; nowPoint = NextNode(polygon->vertice, nowPoint))
+	{
+		s_drawPoint((BG_Point*)NodeObj(polygon->vertice, nowPoint));
+	}
+
+}
+
+/*
+* 函数：s_drawEllipse
+* 功能：用参数方程分线段画椭圆
+*/
+static void s_drawEllipse(AG_Ellipse* ellipse)
+{
+	BG_Point pt[360];
+	double cx = ellipse->point.x, cy = ellipse->point.y;
+	double dx = ellipse->direction.x, dy = ellipse->direction.y;
+
+	double a = ellipse->a;
+	double b = ellipse->b;  // 长短轴
+
+	double sinB = dy / sqrt(dx * dx + dy * dy);
+	double cosB = dx / sqrt(dx * dx + dy * dy);  // 旋转角
+
+	int i;
+	for (i = 0; i < 360; ++i)
+	{
+		double x = a * cos(i * PI / 180);
+		double y = b * sin(i * PI / 180);  // 标准椭圆参数方程
+
+		double xx = x * cosB - y * sinB;
+		double yy = y * cosB + x * sinB;  // 旋转公式
+
+		pt[i].x = xx + cx;
+		pt[i].y = yy + cy;
+	}
+
+	s_drawAllLine(pt, 360, 1);
+}
+
+/*
+* 函数：s_drawHyperbola
+* 功能：画双曲线，做法同椭圆
+*/
+static void s_drawHyperbola(AG_Hyperbola* hyperbola)
+{
+	BG_Point pt[360];
+	double cx = hyperbola->point.x, cy = hyperbola->point.y;
+	double dx = hyperbola->direction.x, dy = hyperbola->direction.y;
+
+	double a = hyperbola->a;
+	double b = hyperbola->b;  // 长短轴
+
+	double sinB = dy / sqrt(dx * dx + dy * dy);
+	double cosB = dx / sqrt(dx * dx + dy * dy);  // 旋转角
+
+	int i;
+	for (i = 0; i < 360; ++i)
+	{
+		if (i == 0 || i == 180) continue;
+		double x = a / cos((i + 270) * PI / 180);
+		double y = b * tan((i + 270) * PI / 180);  // 标准椭圆参数方程
+
+		double xx = x * cosB - y * sinB;
+		double yy = y * cosB + x * sinB;  // 旋转公式
+
+		pt[i].x = xx + cx;
+		pt[i].y = yy + cy;
+	}
+
+	s_drawAllLine(pt + 1, 179, 0);
+	s_drawAllLine(pt + 181, 179, 0);
+
+	// 如果缩到很小，四个方向无法无限延长，用射线代替
+	BG_Line line;
+	line.name = "";
+	line.type = 1;
+	line.point[0] = pt[2]; line.point[1] = pt[1]; s_drawLine(&line);
+	line.point[0] = pt[178]; line.point[1] = pt[179]; s_drawLine(&line);
+	line.point[0] = pt[182]; line.point[1] = pt[181]; s_drawLine(&line);
+	line.point[0] = pt[358]; line.point[1] = pt[359]; s_drawLine(&line);
+}
+
+/*
+* 函数：s_drawParabola
+* 功能：画抛物线
+*/
+static void s_drawParabola(AG_Parabola* parabola)
+{
+	double f = parabola->f;
+	double cx = parabola->point.x, cy = parabola->point.y;
+	double dx = parabola->direction.x, dy = parabola->direction.y;
+
+	double leftX = BG_inchToAxisX(0), rightX = BG_inchToAxisX(s_windowWidth);
+	double downY = BG_inchToAxisY(0), upY = BG_inchToAxisY(s_windowHeight);	 // 窗口边界的数值坐标
+
+	double minX = INF, maxX = -INF;  // “可能”在窗口中出现的双曲线x范围
+	double X[4] = { leftX, rightX, leftX, rightX };
+	double Y[4] = { downY, downY, upY, upY };	// 四个角
+	BG_Line line;
+
+	int i;
+	for (i = 0; i < 4; ++i)
+	{
+		line.point[0] = (BG_Point){ "", X[i], Y[i] };
+		line.point[1] = (BG_Point){ "", X[i] - dy, Y[i] + dx };
+		double dis = BA_disPointLine(&parabola->point, &line);
+		if (s_DotProduct(dx, dy, X[i] - cx, Y[i] - cy) < 0) dis = 0;  // 钝角说明顶点在这条线后面
+		minX = Min(minX, dis);  maxX = Max(maxX, dis);
+	}
+
+	// 只考虑x in [minX, maxX]，并且拆成若干份
+	// 开始打点连线，类似另外两个圆锥曲线
+
+	int sign = 1, j;
+	BG_Point pt[201];
+
+	double sinB = dy / sqrt(dx * dx + dy * dy);
+	double cosB = dx / sqrt(dx * dx + dy * dy);  // 旋转角
+	double part = (maxX - minX) / 200, nowX;
+
+	for (j = 0; j < 2; ++j, sign *= -1)	 // 同时考虑两种y
+	{
+		for (i = 0, nowX = minX; i <= 200; ++i, nowX += part)
+		{
+			double x = nowX;
+			double y = 2 * sqrt(f * x) * sign;
+
+			double xx = x * cosB - y * sinB;
+			double yy = y * cosB + x * sinB;  // 旋转公式
+			pt[i].x = xx + cx;
+			pt[i].y = yy + cy;
+		}
+		s_drawAllLine(pt, 201, 0);
+	}
+}
 
 
 /*
@@ -815,6 +1146,29 @@ static void s_drawALine(double x1, double y1, double x2, double y2)
 	MovePen(x1, y1);
 	DrawLine(x2 - x1, y2 - y1);
 }
+
+
+
+/*
+* 函数：s_drawAllLine
+* 功能：使用一个点数组画图形
+		类似多边形，不过可以用于拟合曲线
+		closed决定闭合与否
+*/
+static void s_drawAllLine(BG_Point* point, int n, bool closed)
+{
+	if (!n) return;
+
+	SetPenSize(LINESIZE);
+	MovePen(BG_axisToInchX(point[0].x), BG_axisToInchY(point[0].y));
+	for (int i = 1; i < n; ++i)
+		DrawLine(BG_axisToInchX(point[i].x) - BG_axisToInchX(point[i - 1].x),
+		  	BG_axisToInchY(point[i].y) - BG_axisToInchY(point[i - 1].y));
+	if(closed) 
+		DrawLine(BG_axisToInchX(point[0].x) - BG_axisToInchX(point[n - 1].x),
+			BG_axisToInchY(point[0].y) - BG_axisToInchY(point[n - 1].y));
+}
+
 
 
 

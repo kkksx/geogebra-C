@@ -86,6 +86,7 @@ KeyboardEventCallback g_keyboard = NULL;
 MouseEventCallback g_mouse = NULL;
 TimerEventCallback g_timer = NULL;
 CharEventCallback g_char = NULL;
+HINSTANCE g_instance = NULL;
 
 /*
  * Type: graphicsStateT
@@ -882,7 +883,7 @@ static void InitDisplay(void)
       RectHeight(&graphicsRect),
       /*consoleWindow*/ NULL, 
       (HMENU) NULL, 
-      (HINSTANCE) NULL,
+      g_instance,
       (LPSTR) NULL);
       
     if (graphicsWindow == NULL) {
@@ -1930,6 +1931,8 @@ int WINAPI WinMain (HINSTANCE hThisInstance,
 {
     MSG messages;            /* Here messages to the application are saved */
     
+    g_instance = hThisInstance;
+
     Main();
 
     /* Run the message loop. It will run until GetMessage() returns 0 */
@@ -2037,9 +2040,28 @@ void GUI_addButton(double x, double y, double w, double h, char* file)
     SendMessage(hButton, BM_SETIMAGE, IMAGE_BITMAP, (LPARAM)hBmp);
 }
 
-
-
-void GUI_addBitmap()
+void GUI_addBitmap(double x, double y, double w, double h, char* file)
 {
+    GUI_update();
 
+    double fx = ScaleX(x);
+    double fy = ScaleY(y);
+    double fw = ScaleX(w);
+    double fh = ScaleY(GetWindowHeight() - h);
+
+    HBITMAP hBmp = (HBITMAP)LoadImage(NULL, file, IMAGE_BITMAP, fw, fh, LR_LOADFROMFILE);
+    if (!hBmp) hBmp = (HBITMAP)LoadImage(NULL, Concat("../", file), IMAGE_BITMAP, fw, fh, LR_LOADFROMFILE);
+
+    if (!hBmp) exit(0);  // 同上，这个地方要改改
+
+    HDC mdc = CreateCompatibleDC(osdc);  // 创建一个与指定设备兼容的内存设备上下文环境
+
+    SelectObject(mdc, hBmp);  // 选入设备环境
+    BitBlt(osdc, fx, fy, fw, fh, mdc, 0, 0, SRCAND);
+}
+
+inline void GUI_update()
+{
+    //DoUpdate();
+    PostMessage(graphicsWindow, WM_PAINT, 0, 0);
 }

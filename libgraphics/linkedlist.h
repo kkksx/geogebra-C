@@ -134,4 +134,21 @@ struct linkedlistCDT {
     struct linkedlistCDT *next;
 };
 
+
+
+
+/*
+* 函数：DeleteLastNode
+* 功能：删除链表的最后一项，并返回这一项
+*/
+linkedlistADT DeleteLastNode(linkedlistADT head);
+
+/*
+* 函数：FindLastNode
+* 功能：搜索并返回链表最后一项
+*/
+linkedlistADT FindLastNode(linkedlistADT head);
+
+
+
 #endif

@@ -4,7 +4,6 @@
 /*
 *
 * 文件名：BasicAnalysis.h
-* 作者：kkksx
 *
 * 功能：基础图形关系和分析计算
 *
@@ -26,6 +25,12 @@ double BA_disPointLine(BG_Point* point, BG_Line* line);
 * 功能：两点之间的距离
 */
 double BA_disPointPoint(BG_Point* point1, BG_Point* point2);
+
+/*
+* 接口：BA_midPoint
+* 功能：求中点
+*/
+BG_Point BA_midPoint(BG_Point* point1, BG_Point* point2);
 
 
 #endif // !_BA_H
