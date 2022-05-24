@@ -41,4 +41,14 @@ string NL_getGreekLetter();
 bool NL_deleteName(string name, int type);
 
 
+/*
+* 接口：NL_occupyName
+* 功能：设置一个名字为占用
+*		0:小写，1:大写，2:希腊字母
+*		成功占用则返回1，如果已经被占用则返回0
+*		
+*		该函数也可以用作判断一个名字是否被占用
+*/
+bool NL_occupyName(string name, int type);
+
 #endif

@@ -4,7 +4,7 @@
 /*
 * 文件名：AdvanceGraphics.h
 * 
-* 功能：绘制较复杂的图形，不需要名字
+* 功能：扇形、多边形、圆锥曲线
 *
 * 
 */
@@ -15,16 +15,31 @@
 #include "boolean.h"
 
 /*
+* 结构：扇形
+*/
+typedef struct
+{
+	string   name;   // 名字
+	BG_Point point;  // 圆心
+	double   r;      // 半径
+	double   start;  // 起点角度
+	double   end;    // 终点角度
+	string   color;  // 区域颜色
+}AG_Sector;
+
+/*
 * 结构：多边形
 *	结点按顺序列出
 */
 typedef struct
 {
+	string		  name;		  // 名字
 	linkedlistADT vertice;    // 结点链表
 	linkedlistADT edge;       // 边链表，该链表随点列表刷新（终点->起点不在该表中）
 	string		  color;      // 区域颜色
 	bool          closed;     // 该多边形是否闭合（起点终点是否连接）
 }AG_Polygon;
+
 
 /*
 * 结构：椭圆
@@ -32,9 +47,10 @@ typedef struct
 */
 typedef struct
 {
+	string   name;		  // 名字
 	BG_Point point;       // 圆心
 	BG_Point direction;   // 长轴方向向量
-	double a, b;		  // 半长轴 & 半短轴
+	double   a, b;		  // 半长轴 & 半短轴
 }AG_Ellipse;
 
 /*
@@ -43,9 +59,10 @@ typedef struct
 */
 typedef struct
 {
+	string   name;		  // 名字
 	BG_Point point;		  // 中心
 	BG_Point direction;   // 实轴方向向量
-	double a, b;		  // 半实轴 & 半虚轴
+	double   a, b;		  // 半实轴 & 半虚轴
 }AG_Hyperbola;
 
 /*
@@ -53,10 +70,20 @@ typedef struct
 */
 typedef struct
 {
+	string   name;		  // 名字
 	BG_Point point;       // 顶点
 	BG_Point direction;   // 对称轴的方向向量，必须指向凹的方向
-	double f;			  // 焦距OF
+	double   f;			  // 焦距OF
 }AG_Parabola;
+
+
+
+
+/*
+* 接口：AG_addSector
+* 功能：创建一个扇形，以color进行填充
+*/
+AG_Sector* AG_addSector(double x, double y, double r, double start, double end, string color);
 
 
 
@@ -107,6 +134,26 @@ AG_Parabola* AG_addParabola(BG_Point point, BG_Point direction, double f);
 
 
 
+
+//--------------非标准添加圆锥曲线的接口-------------------
+
+/*
+* 接口：AG_addEllipseBy3Point
+* 功能：三点定椭圆，前两点是两焦点
+*/
+AG_Ellipse* AG_addEllipseBy3Point(BG_Point a, BG_Point b, BG_Point c);
+
+/*
+* 接口：AG_addHyperbolaBy3Point
+* 功能：三点定双曲线，前两点是两焦点
+*/
+AG_Hyperbola* AG_addHyperbolaBy3Point(BG_Point a, BG_Point b, BG_Point c);
+
+/*
+* 接口：AG_addParabolaByPointLine
+* 功能：焦点和准线定抛物线
+*/
+AG_Parabola* AG_addParabolaByPointLine(BG_Point a, BG_Line l);
 
 
 

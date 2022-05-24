@@ -8,6 +8,10 @@
 *	AdvanceGraphics.h
 * 中定义的接口
 * 
+* 图形种类：0:点，1:直线，2:向量，3:弧
+		   4：多边形，5：扇面
+		   6：椭圆，7：双曲线，8：抛物线
+* 
 * 此模块影响绘图区域
 * 
 * 数值距离：以数字形式写出来的距离，即在坐标轴内的距离
@@ -37,9 +41,9 @@
 #include "NameLib.h"
 
 #define EPSILON   0.00000001		// double精度
-#define PI        3.1415926535		// 圆周率π
+#define PI        3.1415926535897	// 圆周率π
 #define INF		  1145141919.810	// 极大值
-#define LINESIZE  3					// 线的粗细
+#define LINESIZE  2					// 线的粗细
 
 #define Max(x, y) (((x) > (y)) ? (x) : (y))
 #define Min(x, y) (((x) < (y)) ? (x) : (y))
@@ -54,14 +58,19 @@ static double s_axisInches = 1;				// 原点到第一条刻度线的实际距离，应该保证该值
 static double s_axisX = 0, s_axisY = 0;		// 窗口中心点的数值坐标
 
 // 记录图像，在链表中==已经被绘出
+// 使用二维链表减少代码量( ? )
+static linkedlistADT s_list;			 // 超级链表，节点内容为以下各个链表的头
 static linkedlistADT s_listPoint;		 // 点-链表
 static linkedlistADT s_listLine;		 // 线-链表
 static linkedlistADT s_listVector;		 // 向量-链表
 static linkedlistADT s_listArc;			 // 弧-链表
 static linkedlistADT s_listPolygon;		 // 多边形-链表
+static linkedlistADT s_listSector;		 // 扇面-链表
 static linkedlistADT s_listEllipse;		 // 椭圆-链表
 static linkedlistADT s_listHyperbola;    // 双曲线-链表
 static linkedlistADT s_listParabola;     // 抛物线-链表
+
+
 
 // 画笔状态
 static int    s_penSize;			// 画笔大小
@@ -84,6 +93,7 @@ static void s_drawPolygon(AG_Polygon* polygon);
 static void s_drawEllipse(AG_Ellipse* ellipse);
 static void s_drawHyperbola(AG_Hyperbola* hyperbola);
 static void s_drawParabola(AG_Parabola* parabola);
+static void s_drawSector(AG_Sector* sector);
 
 // 封装一些方便的函数
 static void s_drawACircle(double x, double y, double r);
@@ -99,9 +109,12 @@ static double s_RA_findX();
 static double s_RA_findY();
 
 // 一些数学函数
+static int s_dcmp(double x);
+static double s_angle(double x1, double y1, double x2, double y2);
 static double s_Radians(double degrees);
 static double s_Degrees(double radians);
 static double s_DotProduct(double x1, double y1, double x2, double y2);
+static double s_CrossProduct(double x1, double y1, double x2, double y2);
 
 
 
@@ -271,18 +284,21 @@ void BG_init()
 	DefineColor("somehow white", 0.8, 0.8, 0.9);
 
 	// 初始化窗口信息
-	s_windowWidth = GetWindowWidth();		// 注意这里，画坐标系的窗口
+	s_windowWidth = GetWindowWidth();			// 注意这里，画坐标系的窗口
 	s_windowHeight = GetWindowHeight() - 1;		// 不一定是整个窗口范围，这里只是一个示范
 
 	// 初始化链表
-	s_listPoint = NewLinkedList();
-	s_listLine = NewLinkedList();
-	s_listVector = NewLinkedList();
-	s_listArc = NewLinkedList();
-	s_listPolygon = NewLinkedList();
-	s_listEllipse = NewLinkedList();
-	s_listHyperbola = NewLinkedList();
-	s_listParabola = NewLinkedList();
+	s_list = NewLinkedList();
+	s_listPoint = NewLinkedList();		 InsertNode(s_list, NULL, s_listPoint);
+	s_listLine = NewLinkedList();		 InsertNode(s_list, NULL, s_listLine);
+	s_listVector = NewLinkedList();		 InsertNode(s_list, NULL, s_listVector);
+	s_listArc = NewLinkedList();		 InsertNode(s_list, NULL, s_listArc);
+	s_listPolygon = NewLinkedList();	 InsertNode(s_list, NULL, s_listPolygon);
+	s_listSector = NewLinkedList();		 InsertNode(s_list, NULL, s_listSector);
+	s_listEllipse = NewLinkedList();	 InsertNode(s_list, NULL, s_listEllipse);
+	s_listHyperbola = NewLinkedList();	 InsertNode(s_list, NULL, s_listHyperbola);
+	s_listParabola = NewLinkedList();	 InsertNode(s_list, NULL, s_listParabola);
+	
 }
 
 void BG_repaint()
@@ -293,6 +309,12 @@ void BG_repaint()
 	for (now = NextNode(s_listPolygon, s_listPolygon); now; now = NextNode(s_listPolygon, now))
 	{
 		s_drawPolygon(NodeObj(s_listPolygon, now));
+	}
+
+	// 扇面
+	for (now = NextNode(s_listSector, s_listSector); now; now = NextNode(s_listSector, now))
+	{
+		s_drawSector(NodeObj(s_listSector, now));
 	}
 
 	// 线
@@ -338,6 +360,7 @@ void BG_repaint()
 	}
 }
 
+
 BG_Point* BG_addPoint(double x, double y)
 {
 	// 加一个点进入链表
@@ -378,6 +401,8 @@ BG_Vector* BG_addVector(double x1, double y1, double x2, double y2)
 
 BG_Arc* BG_addArc(double x, double y, double r, double start, double end)
 {
+	while (end < start) end += 360;	
+
 	BG_Arc* arc = New(BG_Arc*);
 	arc->point = (BG_Point){ "", x, y };
 	arc->r = r;
@@ -420,27 +445,18 @@ double BG_inchToAxisY(double y)
 
 void BG_deleteGraphic(string name)
 {
-	int nameType = -1;
+	int nameType = -1, listCount = 0;
 	int type = BG_getGraphicType(name);
+	linkedlistADT listHead = NextNode(s_list, s_list);
 	linkedlistADT head = NULL, now = NULL;
-	switch (type)
+
+	for (; listHead; listHead = NextNode(NULL, listHead), ++listCount)
 	{
-	case 0:
-		head = s_listPoint;
-		nameType = 1;
-		break;
-	case 1:
-		head = s_listLine;
-		nameType = 0;
-		break;
-	case 2:
-		head = s_listVector;
-		nameType = 0;
-		break;
-	case 3:
-		head = s_listArc;
-		nameType = 0;
-		break;
+		if (type == listCount)
+		{
+			head = listHead->dataptr;
+			nameType = (listCount == 0);	// 只有点是大写字母
+		}
 	}
 
 	for (now = NextNode(head, head); now; now = NextNode(head, now))
@@ -463,7 +479,7 @@ string BG_getGraphicName(double x, double y)
 	pt->x = BG_inchToAxisX(x);
 	pt->y = BG_inchToAxisY(y);
 
-	double range = 0.1 * s_axisCalibration / s_axisInches;  // 鼠标点击判定圆形区域0.1英寸
+	double range = 0.05 * s_axisCalibration / s_axisInches;  // 鼠标点击判定圆形区域0.05英寸
 
 	// 点
 	for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
@@ -527,18 +543,116 @@ string BG_getGraphicName(double x, double y)
 
 		if (fabs(BA_disPointPoint(pt, &arc->point) - arc->r) >= range) continue;
 
-		double angle;
-		if (fabs(dx) <= EPSILON) angle = PI / 2;
-		else
-		{
-			angle = atan(dy / dx);
-			if (dx < 0) angle += PI;
-			else if (angle < 0) angle += PI * 2;
-		}
-		angle = s_Degrees(angle);
-		if (arc->start - EPSILON <= angle && angle <= arc->end + EPSILON) return arc->name;
+		double angle = s_angle(arc->point.x, arc->point.y, pt->x, pt->y);
+		while (angle < arc->start) angle += 360;
+		if (angle <= arc->end) return arc->name;
 	}
 	
+	// 多边形
+	// 判断标准：射线法 且 区域至少三个点
+	for (now = NextNode(s_listPolygon, s_listPolygon); now; now = NextNode(s_listPolygon, now))
+	{
+		linkedlistADT firstPoint = NextNode(NULL, ((AG_Polygon*)(now->dataptr))->vertice), point;
+		int count = 0;	// 点数
+		int flag = 0;   // 交点数
+		for (point = firstPoint; point; point = NextNode(NULL, point))
+		{
+			++count;
+			BG_Point* p1 = NodeObj(NULL, point);
+			BG_Point* p2 = NULL;
+			if (point->next == NULL) p2 = NodeObj(NULL, firstPoint);
+			else p2 = NodeObj(NULL, point->next);
+
+			// 先判断是否点击到线上
+			if (fabs(s_CrossProduct(p2->x - p1->x, p2->y - p1->y, pt->x - p1->x, pt->y - p1->y)) < EPSILON) 
+				return ((AG_Polygon*)now->dataptr)->name;
+
+			// 处理(pt->x, pt->y)向右的一条射线与(p1->x, p1->y)--(p2->x, p2->y)的交点问题
+			// 第一个判断保证了pt->y在两点y之间
+			// 第二个判断保证了点在线左边
+			// 第三个判断保证了交点不是y值较小的点
+			if ((s_dcmp(p1->y - pt->y) > 0 != s_dcmp(p2->y - pt->y) > 0) 
+				&& s_dcmp(pt->x - (pt->y - p1->y) * (p1->x - p2->x) / (p1->y - p2->y) - p1->x) < 0
+				&& s_dcmp(pt->y - Min(p1->y, p2->y)) > 0)
+					++flag;
+		}
+		if (count >= 3 && flag % 2) return ((AG_Polygon*)now->dataptr)->name;
+	}
+
+	// 扇面
+	for (now = NextNode(s_listSector, s_listSector); now; now = NextNode(s_listSector, now))
+	{
+		AG_Sector* sector = NodeObj(s_listSector, now);
+		double dx = pt->x - sector->point.x;
+		double dy = pt->y - sector->point.y;
+
+		if (BA_disPointPoint(pt, &sector->point) >= sector->r) continue;
+		
+		double angle = s_angle(sector->point.x, sector->point.y, pt->x, pt->y);
+		while (angle < sector->start) angle += 360;
+		if (angle <= sector->end) return sector->name;
+	}
+
+	// 椭圆
+	// 判断标准：到焦点距离和 = 2a
+	for (now = NextNode(s_listEllipse, s_listEllipse); now; now = NextNode(s_listEllipse, now))
+	{
+		AG_Ellipse* ellipse = NodeObj(s_listEllipse, now);
+		BG_Point center = ellipse->point;
+		BG_Point p1, p2;
+		double dx = ellipse->direction.x, dy = ellipse->direction.y;
+		double d = sqrt(pow(dx, 2) + pow(dy, 2));
+		double a = ellipse->a, b = ellipse->b, c = sqrt(a * a - b * b);
+		p1.x = center.x + c * dx / d;
+		p1.y = center.y + c * dy / d;
+		p2.x = center.x - c * dx / d;
+		p2.y = center.y - c * dy / d;
+		
+		if (fabs(BA_disPointPoint(&p1, pt) +	BA_disPointPoint(&p2, pt) - 2 * a) < range) 
+			return ellipse->name;
+	}
+
+	// 双曲线
+	// 判断标准：到焦点距离差 = 2a
+	for (now = NextNode(s_listHyperbola, s_listHyperbola); now; now = NextNode(s_listHyperbola, now))
+	{
+		AG_Hyperbola* hyperbola = NodeObj(s_listHyperbola, now);
+		BG_Point center = hyperbola->point;
+		BG_Point p1, p2;
+		double dx = hyperbola->direction.x, dy = hyperbola->direction.y;
+		double d = sqrt(pow(dx, 2) + pow(dy, 2));
+		double a = hyperbola->a, b = hyperbola->b, c = sqrt(a * a + b * b);
+		p1.x = center.x + c * dx / d;
+		p1.y = center.y + c * dy / d;
+		p2.x = center.x - c * dx / d;
+		p2.y = center.y - c * dy / d;
+
+		if (fabs(fabs(BA_disPointPoint(&p1, pt) - BA_disPointPoint(&p2, pt)) - 2 * a) < range)
+			return hyperbola->name;
+	}
+
+	// 抛物线
+	// 判断标准：到焦点距离 = 到准线距离
+	for (now = NextNode(s_listParabola, s_listParabola); now; now = NextNode(s_listParabola, now))
+	{
+		AG_Parabola* parabola = NodeObj(s_listParabola, now);
+		BG_Point center = parabola->point;
+		BG_Point p;
+		double dx = parabola->direction.x, dy = parabola->direction.y;
+		double d = sqrt(pow(dx, 2) + pow(dy, 2));
+		p.x = center.x + parabola->f * dx / d;
+		p.y = center.y + parabola->f * dy / d;
+
+		BG_Line line;
+		line.point[0].x = center.x - parabola->f * dx / d;
+		line.point[0].y = center.y - parabola->f * dy / d;
+		line.point[1].x = line.point[0].x - dy;
+		line.point[1].y = line.point[0].y + dx;
+
+		if (fabs(BA_disPointLine(pt, &line) - BA_disPointPoint(pt, &p)) < range)
+			return parabola->name;
+	}
+
 	FreeBlock(pt);
 	
 	return "";
@@ -546,46 +660,108 @@ string BG_getGraphicName(double x, double y)
 
 int BG_getGraphicType(string name)
 {
-	linkedlistADT now;
+	int listCount = 0;
+	linkedlistADT listHead = NextNode(s_list, s_list);
+	linkedlistADT head = NULL, now = NULL;
 
-	// 点
-	for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
-		if (StringEqual(((BG_Point*)NodeObj(s_listPoint, now))->name, name)) return 0;
+	for (; listHead; listHead = NextNode(NULL, listHead), ++listCount)
+	{
+		for (now = NextNode(NULL, listHead->dataptr); now; now = NextNode(NULL, now))
+		{
+			if (StringEqual(((BG_Point*)NodeObj(NULL, now))->name, name))
+				return listCount;
+		}
+	}
 
-	// 线
-	for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
-		if (StringEqual(((BG_Line*)NodeObj(s_listLine, now))->name, name)) return 1;
+	//// 点
+	//for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
+	//	if (StringEqual(((BG_Point*)NodeObj(s_listPoint, now))->name, name)) return 0;
 
-	// 向量
-	for (now = NextNode(s_listVector, s_listVector); now; now = NextNode(s_listVector, now))
-		if (StringEqual(((BG_Vector*)NodeObj(s_listVector, now))->name, name)) return 2;
+	//// 线
+	//for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
+	//	if (StringEqual(((BG_Line*)NodeObj(s_listLine, now))->name, name)) return 1;
 
-	// 弧
-	for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
-		if (StringEqual(((BG_Arc*)NodeObj(s_listArc, now))->name, name)) return 3;
+	//// 向量
+	//for (now = NextNode(s_listVector, s_listVector); now; now = NextNode(s_listVector, now))
+	//	if (StringEqual(((BG_Vector*)NodeObj(s_listVector, now))->name, name)) return 2;
+
+	//// 弧
+	//for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
+	//	if (StringEqual(((BG_Arc*)NodeObj(s_listArc, now))->name, name)) return 3;
+
+	//// 多边形
+	//for (now = NextNode(s_listPolygon, s_listPolygon); now; now = NextNode(s_listPolygon, now))
+	//	if (StringEqual(((AG_Polygon*)NodeObj(s_listPolygon, now))->name, name)) return 4;
+
+	//// 扇面
+	//for (now = NextNode(s_listSector, s_listSector); now; now = NextNode(s_listSector, now))
+	//	if (StringEqual(((AG_Sector*)NodeObj(s_listSector, now))->name, name)) return 5;
+
+	//// 椭圆
+	//for (now = NextNode(s_listEllipse, s_listEllipse); now; now = NextNode(s_listEllipse, now))
+	//	if (StringEqual(((AG_Ellipse*)NodeObj(s_listEllipse, now))->name, name)) return 6;
+
+	//// 双曲线
+	//for (now = NextNode(s_listHyperbola, s_listHyperbola); now; now = NextNode(s_listHyperbola, now))
+	//	if (StringEqual(((AG_Hyperbola*)NodeObj(s_listHyperbola, now))->name, name)) return 7;
+
+	//// 抛物线
+	//for (now = NextNode(s_listParabola, s_listParabola); now; now = NextNode(s_listParabola, now))
+	//	if (StringEqual(((AG_Parabola*)NodeObj(s_listParabola, now))->name, name)) return 8;
 
 	return -1;
 }
 
 void* BG_getGraphic(string name)
 {
-	linkedlistADT now;
+	int listCount = 0;
+	linkedlistADT listHead = NextNode(s_list, s_list);
+	linkedlistADT head = NULL, now = NULL;
 
-	// 点
-	for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
-		if (StringEqual(((BG_Point*)NodeObj(s_listPoint, now))->name, name)) return now->dataptr;
+	for (; listHead; listHead = NextNode(NULL, listHead), ++listCount)
+	{
+		for (now = NextNode(NULL, listHead->dataptr); now; now = NextNode(NULL, now))
+		{
+			if (StringEqual(((BG_Point*)NodeObj(s_listPoint, now))->name, name)) 
+				return now->dataptr;
+		}
+	}
 
-	// 线
-	for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
-		if (StringEqual(((BG_Line*)NodeObj(s_listLine, now))->name, name)) return now->dataptr;
+	//// 点
+	//for (now = NextNode(s_listPoint, s_listPoint); now; now = NextNode(s_listPoint, now))
+	//	if (StringEqual(((BG_Point*)NodeObj(s_listPoint, now))->name, name)) return now->dataptr;
 
-	// 向量
-	for (now = NextNode(s_listVector, s_listVector); now; now = NextNode(s_listVector, now))
-		if (StringEqual(((BG_Vector*)NodeObj(s_listVector, now))->name, name)) return now->dataptr;
+	//// 线
+	//for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
+	//	if (StringEqual(((BG_Line*)NodeObj(s_listLine, now))->name, name)) return now->dataptr;
 
-	// 弧
-	for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
-		if (StringEqual(((BG_Arc*)NodeObj(s_listArc, now))->name, name)) return now->dataptr;
+	//// 向量
+	//for (now = NextNode(s_listVector, s_listVector); now; now = NextNode(s_listVector, now))
+	//	if (StringEqual(((BG_Vector*)NodeObj(s_listVector, now))->name, name)) return now->dataptr;
+
+	//// 弧
+	//for (now = NextNode(s_listArc, s_listArc); now; now = NextNode(s_listArc, now))
+	//	if (StringEqual(((BG_Arc*)NodeObj(s_listArc, now))->name, name)) return now->dataptr;
+
+	//// 多边形
+	//for (now = NextNode(s_listPolygon, s_listPolygon); now; now = NextNode(s_listPolygon, now))
+	//	if (StringEqual(((AG_Polygon*)NodeObj(s_listPolygon, now))->name, name)) return now->dataptr;
+
+	//// 扇面
+	//for (now = NextNode(s_listSector, s_listSector); now; now = NextNode(s_listSector, now))
+	//	if (StringEqual(((AG_Sector*)NodeObj(s_listSector, now))->name, name)) return now->dataptr;
+
+	//// 椭圆
+	//for (now = NextNode(s_listEllipse, s_listEllipse); now; now = NextNode(s_listEllipse, now))
+	//	if (StringEqual(((AG_Ellipse*)NodeObj(s_listEllipse, now))->name, name)) return now->dataptr;
+
+	//// 双曲线
+	//for (now = NextNode(s_listHyperbola, s_listHyperbola); now; now = NextNode(s_listHyperbola, now))
+	//	if (StringEqual(((AG_Hyperbola*)NodeObj(s_listHyperbola, now))->name, name)) return now->dataptr;
+
+	//// 抛物线
+	//for (now = NextNode(s_listParabola, s_listParabola); now; now = NextNode(s_listParabola, now))
+	//	if (StringEqual(((AG_Parabola*)NodeObj(s_listParabola, now))->name, name)) return now->dataptr;
 
 	return NULL;
 }
@@ -595,6 +771,29 @@ void* BG_getGraphic(string name)
 
 //----------------------AdvanceGraphics.h接口实现---------------------
 
+// 扇形
+
+AG_Sector* AG_addSector(double x, double y, double r, double start, double end, string color)
+{
+	while (end < start) end += 360;
+
+	AG_Sector* sector = New(AG_Sector*);
+	sector->point = (BG_Point){ "", x, y };
+	sector->r = r;
+	sector->start = start;
+	sector->end = end;
+	sector->color = color;
+	sector->name = NL_getLowerCase();
+
+	InsertNode(s_listSector, NULL, sector);
+	s_drawSector(sector);
+
+	return sector;
+}
+
+
+
+// 多边形
 
 AG_Polygon* AG_addPolygon(BG_Point** vertice, int n, string color)
 {
@@ -603,6 +802,7 @@ AG_Polygon* AG_addPolygon(BG_Point** vertice, int n, string color)
 	polygon->edge = NewLinkedList();
 	polygon->color = color;
 	polygon->closed = 0;
+	polygon->name = NL_getLowerCase();
 
 	int i;
 	for (i = 0; i < n; ++i)
@@ -646,6 +846,7 @@ bool AG_switchClose(AG_Polygon* polygon)
 }
 
 
+// 基础圆锥曲线绘制
 
 AG_Ellipse* AG_addEllipse(BG_Point point, BG_Point direction, double a, double b)
 {
@@ -654,6 +855,7 @@ AG_Ellipse* AG_addEllipse(BG_Point point, BG_Point direction, double a, double b
 	ellipse->direction = direction;
 	ellipse->a = a;
 	ellipse->b = b;
+	ellipse->name = NL_getLowerCase();
 
 	InsertNode(s_listEllipse, NULL, ellipse);
 	s_drawEllipse(ellipse);
@@ -667,7 +869,8 @@ AG_Hyperbola* AG_addHyperbola(BG_Point point, BG_Point direction, double a, doub
 	hyperbola->point = point;
 	hyperbola->direction = direction;
 	hyperbola->a = a;
-	hyperbola ->b = b;
+	hyperbola->b = b;
+	hyperbola->name = NL_getLowerCase();
 
 	InsertNode(s_listHyperbola, NULL, hyperbola);
 	s_drawHyperbola(hyperbola);
@@ -681,6 +884,7 @@ AG_Parabola* AG_addParabola(BG_Point point, BG_Point direction, double f)
 	parabola->point = point;
 	parabola->direction = direction;
 	parabola->f = f;
+	parabola->name = NL_getLowerCase();
 
 	InsertNode(s_listParabola, NULL, parabola);
 	s_drawParabola(parabola);
@@ -689,18 +893,66 @@ AG_Parabola* AG_addParabola(BG_Point point, BG_Point direction, double f)
 }
 
 
+// 圆锥曲线其他绘制接口
+
+AG_Ellipse* AG_addEllipseBy3Point(BG_Point p1, BG_Point p2, BG_Point p3)
+{
+	double a = (BA_disPointPoint(&p1, &p3) + BA_disPointPoint(&p2, &p3)) / 2;
+	double c = BA_disPointPoint(&p1, &p2) / 2;
+	double b = sqrt(a * a - c * c);
+	return AG_addEllipse(
+		BA_midPoint(&p1, &p2),
+		BA_minusPoint(&p2, &p1),
+		a, b
+	);
+}
+
+AG_Hyperbola* AG_addHyperbolaBy3Point(BG_Point p1, BG_Point p2, BG_Point p3)
+{
+	double a = fabs(BA_disPointPoint(&p1, &p3) - BA_disPointPoint(&p2, &p3)) / 2;
+	double c = BA_disPointPoint(&p1, &p2) / 2;
+	double b = sqrt(c * c - a * a);
+	return AG_addHyperbola(
+		BA_midPoint(&p1, &p2),
+		BA_minusPoint(&p2, &p1),
+		a, b
+	);
+}
+
+AG_Parabola* AG_addParabolaByPointLine(BG_Point point, BG_Line line)
+{
+	BG_Point pedal = BA_getPedal(&point, &line);
+	return AG_addParabola(
+		BA_midPoint(&point, &pedal),
+		BA_minusPoint(&point, &pedal),
+		BA_disPointPoint(&point, &pedal) / 2
+	);
+}
+
+
+
+
+
+
 
 
 //----------------------BasicAnalysis.h接口实现-----------------------
 
 
-double BA_disPointLine(BG_Point* point, BG_Line* line)
+BG_Point BA_minusPoint(BG_Point* a, BG_Point* b)
 {
-	double x1 = line->point[0].x, x2 = line->point[1].x;
-	double y1 = line->point[0].y, y2 = line->point[1].y;
-	double a = y1 - y2, b = x2 - x1, c = x1 * y2 - x2 * y1;  // 一般式
-	
-	return fabs(a * point->x + b * point->y + c) / sqrt(a * a + b * b);
+	BG_Point ret;
+	ret.x = a->x - b->x;
+	ret.y = a->y - b->y;
+	return ret;
+}
+
+BG_Point BA_addPoint(BG_Point* a, BG_Point* b)
+{
+	BG_Point ret;
+	ret.x = a->x + b->x;
+	ret.y = a->y + b->y;
+	return ret;
 }
 
 double BA_disPointPoint(BG_Point* point1, BG_Point* point2)
@@ -715,6 +967,79 @@ BG_Point BA_midPoint(BG_Point* point1, BG_Point* point2)
 	mid.y = (point1->y + point2->y) / 2;
 	return mid;
 }
+
+BG_Line BA_midperpendicular(BG_Point* p1, BG_Point* p2)
+{
+	BG_Point a = BA_midPoint(p1, p2);
+	double dx = p1->x - p2->x;
+	double dy = p1->y - p2->y;
+	BG_Point b = (BG_Point){ "", a.x - dy, a.y + dx };
+	return (BG_Line) { "", a, b, 0 };
+}
+
+
+
+double BA_disPointLine(BG_Point* point, BG_Line* line)
+{
+	double x1 = line->point[0].x, x2 = line->point[1].x;
+	double y1 = line->point[0].y, y2 = line->point[1].y;
+	double a = y1 - y2, b = x2 - x1, c = x1 * y2 - x2 * y1;  // 一般式
+	
+	return fabs(a * point->x + b * point->y + c) / sqrt(a * a + b * b);
+}
+
+BG_Point BA_getPedal(BG_Point* point, BG_Line* line)
+{
+	double dis = BA_disPointLine(point, line);
+	double x = line->point[1].x - line->point[0].x;
+	double y = line->point[1].y - line->point[0].y;
+	double d = sqrt(x * x + y * y);
+	double dx = -y / d, dy = x / d;  // 方向向量
+	return (BG_Point) { "", point->x + dx * dis, point->y + dy * dis };
+}
+
+
+
+bool BA_isParallel(BG_Line* line1, BG_Line* line2)
+{
+	double x1 = line1->point[1].x - line1->point[0].x;
+	double y1 = line1->point[1].y - line1->point[0].y;
+	double x2 = line2->point[1].x - line2->point[0].x;
+	double y2 = line2->point[1].y - line2->point[0].y;
+
+	return fabs(x1 * y2 - x2 * y1) < EPSILON;
+}
+
+bool BA_isVertical(BG_Line* line1, BG_Line* line2)
+{
+	double x1 = line1->point[1].x - line1->point[0].x;
+	double y1 = line1->point[1].y - line1->point[0].y;
+	double x2 = line2->point[1].x - line2->point[0].x;
+	double y2 = line2->point[1].y - line2->point[0].y;
+
+	return fabs(x1 * x2 + y1 * y2) < EPSILON;
+}
+
+BG_Point BA_crossPoint(BG_Line* line1, BG_Line* line2)
+{
+	if (BA_isParallel(line1, line2))  // 实际上应该在调用该函数前先判断平行
+		return (BG_Point) { "", INF, INF };
+
+	double a1 = line1->point[1].y - line1->point[0].y;
+	double b1 = line1->point[0].x - line1->point[1].x;
+	double c1 = line1->point[0].x * line1->point[1].y - line1->point[1].x * line1->point[0].y;
+
+	double a2 = line2->point[1].y - line2->point[0].y;
+	double b2 = line2->point[0].x - line2->point[1].x;
+	double c2 = line2->point[0].x * line2->point[1].y - line2->point[1].x * line2->point[0].y;
+
+	return (BG_Point) {	"",
+		(c1 * b2 - c2 * b1) / (a1 * b2 - a2 * b1),
+		(a1 * c2 - a2 * c1) / (a1 * b2 - a2 * b1)
+	};
+}
+
+
 
 
 //------------------------静态函数实现----------------------------
@@ -1099,6 +1424,39 @@ static void s_drawParabola(AG_Parabola* parabola)
 	}
 }
 
+/*
+* 函数：s_drawSector
+* 功能：画扇形
+*/
+static void s_drawSector(AG_Sector* sector)
+{
+	if (sector == NULL) return;
+
+	SetPenSize(LINESIZE);
+	SetPenColor(sector->color);
+
+	double x = BG_axisToInchX(sector->point.x);
+	double y = BG_axisToInchY(sector->point.y);
+	double r = sector->r / s_axisCalibration * s_axisInches;
+
+	MovePen(x, y);
+	StartFilledRegion(1);
+	DrawLine(r * cos(s_Radians(sector->start)), r * sin(s_Radians(sector->start)));
+	DrawArc(r, sector->start, sector->end - sector->start);
+	DrawLine(-r * cos(s_Radians(sector->end)), -r * sin(s_Radians(sector->end)));
+	EndFilledRegion();
+
+	// 描边
+	SetPenColor("black");
+	DrawLine(r * cos(s_Radians(sector->start)), r * sin(s_Radians(sector->start)));
+	DrawArc(r, sector->start, sector->end - sector->start);
+	DrawLine(-r * cos(s_Radians(sector->end)), -r * sin(s_Radians(sector->end)));
+}
+
+
+
+
+
 
 /*
 * 函数：s_vectorToLine
@@ -1253,7 +1611,15 @@ static double s_RA_findY()
 }
 
 
-
+/*
+* 函数：s_dcmp
+* 功能：三态函数，除去误差只保留x的正负0属性
+*/
+static int s_dcmp(double x) 
+{
+	if (fabs(x) < EPSILON) return 0;
+	return x < 0 ? -1 : 1;
+}
 
 /*
 * 函数：s_Radians
@@ -1275,16 +1641,36 @@ static double s_Degrees(double radians)
 
 /*
 * 函数：s_DotProduct
-* 功能：点乘
+* 功能：点积
 */
 static double s_DotProduct(double x1, double y1, double x2, double y2)
 {
 	return x1 * x2 + y1 * y2;
 }
 
+/*
+* 函数：s_CrossProduct
+* 功能：叉积
+*/
+static double s_CrossProduct(double x1, double y1, double x2, double y2)
+{
+	return x1 * y2 - x2 * y1;
+}
 
+/*
+* 函数：s_angle
+* 功能：求旋转角，返回角度值
+*/
+static double s_angle(double x1, double y1, double x2, double y2)
+{
+	x2 -= x1;  y2 -= y1;
+	double angle = atan(y2 / x2) * 180 / PI;
+	if (x2 < 0 && y2 >= 0) angle = 180 + angle;
+	else if (x2 < 0 && y2 < 0) angle = 180 + angle;
+	else if (x2 >= 0 && y2 < 0) angle = 360 + angle;
 
-
+	return angle;
+}
 
 
 

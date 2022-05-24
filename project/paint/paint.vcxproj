@@ -27,16 +27,22 @@
     <ClCompile Include="..\..\libgraphics\simpio.c" />
     <ClCompile Include="..\..\libgraphics\strlib.c" />
     <ClCompile Include="..\..\source\BasicGraphics.c" />
+    <ClCompile Include="..\..\source\BasicTransform.c" />
     <ClCompile Include="..\..\source\NameLib.c" />
     <ClCompile Include="..\..\source\TestFile.c" />
+    <ClCompile Include="..\..\source\VariousArc.c" />
+    <ClCompile Include="..\..\source\VariousLine.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\AdvanceGraphics.h" />
     <ClInclude Include="..\..\include\BasicAnalysis.h" />
     <ClInclude Include="..\..\include\BasicGraphics.h" />
+    <ClInclude Include="..\..\include\BasicTransform.h" />
     <ClInclude Include="..\..\include\NameLib.h" />
     <ClInclude Include="..\..\include\ReferenceAxis.h" />
     <ClInclude Include="..\..\include\SimpleGUI.h" />
+    <ClInclude Include="..\..\include\VariousArc.h" />
+    <ClInclude Include="..\..\include\VariousLine.h" />
     <ClInclude Include="..\..\libgraphics\boolean.h" />
     <ClInclude Include="..\..\libgraphics\exception.h" />
     <ClInclude Include="..\..\libgraphics\extgraph.h" />

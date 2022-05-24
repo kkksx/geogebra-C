@@ -86,6 +86,7 @@ BG_Point* BG_addPoint(double x, double y);
 /*
 * 接口：BG_addLine
 * 功能：将给定的两个点连线，以此创建一条线，并指定类型
+*		0直线，1射线，2线段
 */
 BG_Line* BG_addLine(double x1, double y1, double x2, double y2, int type);
 
