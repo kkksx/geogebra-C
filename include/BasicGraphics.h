@@ -16,6 +16,16 @@
 #include "genlib.h"
 #include "strlib.h"
 
+/*
+* 枚举：各个图形
+*/
+typedef enum
+{
+	ID_Point, ID_Line, ID_Vector, ID_Arc,
+	ID_Polygon, ID_Sector,
+	ID_Ellipse, ID_Hyperbola, ID_Parabola
+}Graph;
+
 
 /*
 * 结构：点

@@ -26,6 +26,7 @@
 * 
 */
 #include <math.h>
+#include <string.h>
 
 #include "graphics.h"
 #include "extgraph.h"
@@ -38,10 +39,12 @@
 #include "ReferenceAxis.h"
 #include "AdvanceGraphics.h"
 #include "BasicAnalysis.h"
+
 #include "NameLib.h"
 
 #define EPSILON   0.00000001		// double精度
 #define PI        3.1415926535897	// 圆周率π
+#define E		  2.7182818284590	// 自然对数的底e
 #define INF		  1145141919.810	// 极大值
 #define LINESIZE  2					// 线的粗细
 
@@ -107,6 +110,10 @@ static BG_Line* s_vectorToLine(BG_Vector* vect);
 static void s_RA_drawLine(double x, double y, int type, int style);
 static double s_RA_findX();
 static double s_RA_findY();
+
+// AG会调用的静态函数
+static int s_AG_findNextPos(char* str, int startpos, int r);
+static double s_AG_parseFunction(double x, char* str, int l, int r);
 
 // 一些数学函数
 static int s_dcmp(double x);
@@ -316,6 +323,8 @@ void BG_repaint()
 	{
 		s_drawSector(NodeObj(s_listSector, now));
 	}
+
+	RA_createAxis();
 
 	// 线
 	for (now = NextNode(s_listLine, s_listLine); now; now = NextNode(s_listLine, now))
@@ -788,6 +797,11 @@ AG_Sector* AG_addSector(double x, double y, double r, double start, double end, 
 	InsertNode(s_listSector, NULL, sector);
 	s_drawSector(sector);
 
+	// 新增：记录两条线和一条弧
+	sector->arc = BG_addArc(x, y, r, start, end);
+	sector->line[0] = BG_addLine(x, y, x + r * cos(start * PI / 180), y + r * sin(start * PI / 180), 2);
+	sector->line[1] = BG_addLine(x, y, x + r * cos(end * PI / 180), y + r * sin(end * PI / 180), 2);
+
 	return sector;
 }
 
@@ -810,16 +824,26 @@ AG_Polygon* AG_addPolygon(BG_Point** vertice, int n, string color)
 		// 加一个点进入链表
 		BG_Point* point = vertice[i];
 		InsertNode(polygon->vertice, NULL, point);
-	
+	}
+
+	// 插入该多边形并绘出
+	InsertNode(s_listPolygon, NULL, polygon);
+	s_drawPolygon(polygon);
+
+	for (i = 0; i < n; ++i)
+	{
+		// 加一个点进入链表
+		BG_Point* point = vertice[i];
+
 		if (i + 1 == n) break;
 		BG_Point* point2 = vertice[i + 1];
 		InsertNode(polygon->edge, NULL,
 			BG_addLine(point->x, point->y, point2->x, point2->y, 2));
 	}
 
-	// 插入该多边形并绘出
-	InsertNode(s_listPolygon, NULL, polygon);
-	s_drawPolygon(polygon);
+	for (int i = 0; i < n; ++i)
+		s_drawPoint(vertice[i]);
+
 	return polygon;
 }
 
@@ -931,7 +955,40 @@ AG_Parabola* AG_addParabolaByPointLine(BG_Point point, BG_Line line)
 
 
 
+// 画初等函数
 
+static int errorCode = 0;	// 运算错误
+
+void AG_drawFunction(char* function)
+{
+	int i, n = 0;
+	double left = BG_inchToAxisX(0);
+	double right = BG_inchToAxisX(s_windowWidth);
+	double part = (right - left) / 720;
+
+	BG_Point point[800];
+	for (i = 0; left + i * part <= right; ++i)
+	{
+		++n; 
+		errorCode = 0;
+		point[i].x = left + i * part;
+		point[i].y = s_AG_parseFunction(point[i].x, function, 0, strlen(function));
+		if (errorCode) point[i].y = -INF * 2;
+	}
+
+	for (i = 0; i < n; ++i)
+	{
+		if (fabs(point[i].y) >= INF) continue;
+		int j;
+		for (j = i + 1; j < n; ++j)
+			//if (fabs(point[j].y - point[j - 1].y) / fabs(point[j - 1].y - point[j - 2].y) > 100
+			//	&& s_dcmp(point[j - 1].y - point[j - 2].y) != 0)
+			if(fabs(point[j].y - point[j-1].y) * s_axisInches / s_axisCalibration >= s_windowHeight / 3)
+				break;	// 出现反常高度时跳过
+		s_drawAllLine(point + i, j - i, 0);
+		i = j - 1;
+	}
+}
 
 
 
@@ -1038,6 +1095,23 @@ BG_Point BA_crossPoint(BG_Line* line1, BG_Line* line2)
 		(a1 * c2 - a2 * c1) / (a1 * b2 - a2 * b1)
 	};
 }
+
+
+
+
+
+//----------------------BasicFunction.h接口实现------------------------
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1285,7 +1359,6 @@ static void s_drawPolygon(AG_Polygon* polygon)
 
 	EndFilledRegion();
 
-
 	// 重新画点，保证点在区域上面
 	nowPoint = NextNode(polygon->vertice, polygon->vertice);
 	for (; nowPoint; nowPoint = NextNode(polygon->vertice, nowPoint))
@@ -1447,10 +1520,10 @@ static void s_drawSector(AG_Sector* sector)
 	EndFilledRegion();
 
 	// 描边
-	SetPenColor("black");
-	DrawLine(r * cos(s_Radians(sector->start)), r * sin(s_Radians(sector->start)));
-	DrawArc(r, sector->start, sector->end - sector->start);
-	DrawLine(-r * cos(s_Radians(sector->end)), -r * sin(s_Radians(sector->end)));
+	//SetPenColor("black");
+	//DrawLine(r * cos(s_Radians(sector->start)), r * sin(s_Radians(sector->start)));
+	//DrawArc(r, sector->start, sector->end - sector->start);
+	//DrawLine(-r * cos(s_Radians(sector->end)), -r * sin(s_Radians(sector->end)));
 }
 
 
@@ -1609,6 +1682,186 @@ static double s_RA_findY()
 	X = X < s_windowWidth ? X : s_windowWidth;
 	return X;
 }
+
+
+
+
+
+/*
+* 函数：s_AG_findNextPos
+* 功能：寻找下一个不在括号里面的+ - * /
+*/
+static int s_AG_findNextPos(char* str, int startpos, int r)
+{
+	int j, kh = 0;
+	for (j = startpos; j < r; ++j)
+	{
+		if (str[j] == '(') ++kh;
+		if (str[j] == ')') --kh;
+		if ((str[j] == '+' || str[j] == '-' || str[j] == '*' || str[j] == '/') && !kh) return j;
+	}
+	return r;
+}
+
+/*
+* 
+* 函数：s_AG_parseFunction
+* 功能：函数求值的递归函数
+*		n：点数
+*		str[l, r)是要处理的函数区间
+*		x[]：点的横坐标，一开始给定
+*		y[]：在函数区间中的y值，需要这次递归里面求出
+* 
+* 字符串元素：
+*       符号：( ) + - * / ^
+*       常数：e、x、数
+*       函数：sin、cos、tan、arcsin、arccos、arctan、ln
+*
+* ！这个函数并不会查错，需要保证输入的函数是正确的
+* ！函数式不能省略符号，如3*x不能写成3x
+*/
+static double s_AG_parseFunction(double x, char* str, int l, int r)
+{
+	if (l == r) return 0;
+
+	int i, j;
+	double now = 0;
+
+	for (i = l; i < r;)
+	{
+		char ch = str[i];
+		int kh = 0;
+		switch (ch)
+		{
+
+		// 先是运算符
+
+		case '+':
+			now += s_AG_parseFunction(x, str, i + 1, r);
+			i = r;
+			break;
+
+		case '-':
+			now -= s_AG_parseFunction(x, str, i + 1, r);
+			i = r;
+			break;
+
+		case '*':
+			// 检测后面有没有不在括号内的+、-
+			for (j = i + 1; j < r; ++j)
+			{
+				if (str[j] == '(') ++kh;
+				if (str[j] == ')') --kh;
+				if ((str[j] == '+' || str[j] == '-') && !kh) break;
+			}
+			now *= s_AG_parseFunction(x, str, i + 1, j);
+			i = j;
+			break;
+
+		case '/':
+			// 同乘法
+			for (j = i + 1; j < r; ++j)
+			{
+				if (str[j] == '(') ++kh;
+				if (str[j] == ')') --kh;
+				if ((str[j] == '+' || str[j] == '-') && !kh) break;
+			}
+			if (s_AG_parseFunction(x, str, i + 1, j) == 0) errorCode = 1;	// 除数为0
+			now /= s_AG_parseFunction(x, str, i + 1, j);
+			i = j;
+			break;
+
+		case '^':
+			j = s_AG_findNextPos(str, i + 1, r);
+			if (now == 0 && s_AG_parseFunction(x, str, i + 1, j) == 0) errorCode = 1;   // 0^0
+			now = pow(now, s_AG_parseFunction(x, str, i + 1, j));
+			i = j;
+			break;
+
+		// 然后是函数
+
+		case 'l':	// ln
+			j = s_AG_findNextPos(str, i + 2, r);
+			if (s_AG_parseFunction(x, str, i + 2, j) <= 0) errorCode = 1;	// ln(-Z)
+			now = log(s_AG_parseFunction(x, str, i + 2, j));
+			i = j;
+			break;
+
+		case 's':	// sin
+			j = s_AG_findNextPos(str, i + 3, r);
+			now = sin(s_AG_parseFunction(x, str, i + 3, j));
+			i = j;
+			break;
+
+		case 'c':	// cos
+			j = s_AG_findNextPos(str, i + 3, r);
+			now = cos(s_AG_parseFunction(x, str, i + 3, j));
+			i = j;
+			break;
+
+		case 't':	// tan
+			j = s_AG_findNextPos(str, i + 3, r);
+			now = tan(s_AG_parseFunction(x, str, i + 3, j));
+			i = j;
+			break;
+
+		case 'a':	// arcsin、arccos、arctan
+			j = s_AG_findNextPos(str, i + 6, r);
+			if (str[i + 3] == 's')
+			{
+				if (fabs(s_AG_parseFunction(x, str, i + 6, j)) > 1) errorCode = 1;
+				now = asin(s_AG_parseFunction(x, str, i + 6, j));
+			}
+			else if (str[i + 3] == 'c')
+			{
+				if (fabs(s_AG_parseFunction(x, str, i + 6, j)) > 1) errorCode = 1;
+				now = acos(s_AG_parseFunction(x, str, i + 6, j));
+			}
+			else if(str[i + 3] == 't') now = atan(s_AG_parseFunction(x, str, i + 6, j));
+			i = j;
+			break;
+
+		// 数字直接赋值
+
+		case 'e':
+			now = E;
+			++i;
+			break;
+
+		case 'x':
+			now = x;
+			++i;
+			break;
+
+		case '(':
+			for (j = i; j < r; ++j)
+			{
+				if (str[j] == '(') ++kh;
+				if (str[j] == ')') --kh;
+				if (kh == 0) break;
+			}
+			now = s_AG_parseFunction(x, str, i + 1, j);
+			i = j + 1;
+			break;
+
+		default:	// 数字
+			if (ch < '0' || ch > '9') { ++i; break; }	// 应该不会出现这个情况
+			now = 0;
+			for (j = i; j < r; ++j)
+			{
+				if (str[j] < '0' || str[j] >'9') break;
+				now = now * 10 + str[j] - '0';
+			}
+			i = j;
+		}
+	}
+	return now;
+}
+
+
+
+
+
 
 
 /*

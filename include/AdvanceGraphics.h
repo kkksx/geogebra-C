@@ -4,7 +4,12 @@
 /*
 * 文件名：AdvanceGraphics.h
 * 
-* 功能：扇形、多边形、圆锥曲线
+* 图形种类：
+*		4：多边形、5：扇形
+*		6：椭圆、7：双曲线、8：抛物线
+* 
+* 
+* 任意函数图像
 *
 * 
 */
@@ -25,6 +30,10 @@ typedef struct
 	double   start;  // 起点角度
 	double   end;    // 终点角度
 	string   color;  // 区域颜色
+
+	// updated on 20220525，为了给扇形添加描边
+	BG_Arc*  arc;		// 对应的弧，属性同扇形
+	BG_Line* line[2];   // 对应的两条直线
 }AG_Sector;
 
 /*
@@ -154,6 +163,17 @@ AG_Hyperbola* AG_addHyperbolaBy3Point(BG_Point a, BG_Point b, BG_Point c);
 * 功能：焦点和准线定抛物线
 */
 AG_Parabola* AG_addParabolaByPointLine(BG_Point a, BG_Line l);
+
+
+
+/*
+* 接口：AG_drawFunction
+* 功能：用定比分点的方法画一个初等函数
+	（尽量）保证该函数在定义域内连续
+*/
+void AG_drawFunction(string function);
+
+
 
 
 

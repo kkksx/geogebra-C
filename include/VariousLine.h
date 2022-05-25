@@ -55,7 +55,7 @@ BG_Line VL_tangent(BG_Arc* arc, BG_Point* point, bool left);
 */
 BG_Line VL_bestMatch(linkedlistADT* point);
 
-
+ 
 
 
 

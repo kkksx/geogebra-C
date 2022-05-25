@@ -29,6 +29,9 @@ void Display()
 	BG_repaint();
 	//test();
 	GUI_addBitmap(5, 5, 1, 1, "../resource/Cbitmap/arrow.bmp");  // 加位图
+	AG_drawFunction("1+x^2+x/2");
+	AG_drawFunction("1/(x-1)");
+	AG_drawFunction("(e^x+ln(2*x))/sin(x)");
 	GUI_update();
 }
 
@@ -137,16 +140,14 @@ void Main()
 */
 
 	// 多边形测试
-	BG_Point* pt[3] = { BG_addPoint(0, 0), BG_addPoint(0,1), BG_addPoint(1,1) };
-	
-	AG_Polygon* poly1 = AG_addPolygon(pt, 3, "red");
+	//BG_Point* pt[3] = { BG_addPoint(0, 0), BG_addPoint(0,1), BG_addPoint(1,1) };
+	//
+	//AG_Polygon* poly1 = AG_addPolygon(pt, 3, "yellow");
 	//AG_addPoint(poly1, BG_addPoint(2, -3));
 
 	//MovePen(10, 5);
 	//DrawEllipticalArc(1.0, 2.0, 90, 180);
 
-	NL_occupyName("a", 0);
-	NL_occupyName("b", 0);
 	// 椭圆 & 双曲线
 	BG_Point a, b;
 	a.x = 2; a.y = 0;
@@ -155,13 +156,13 @@ void Main()
 	//AG_addHyperbola(a, b, 4, 5);
 	//AG_addParabola(a, b, 2);
 
-	AG_addEllipseBy3Point(a, b, (BG_Point){ "", 1, 1 });
-	AG_addHyperbolaBy3Point(a, b, (BG_Point) { "", 1, 1 });
-	AG_addParabolaByPointLine(a, (BG_Line) { "", (BG_Point) { "", -2, 0 }, (BG_Point) { "", -2, 1 } });
+	//AG_addEllipseBy3Point(a, b, (BG_Point){ "", 1, 1 });
+	//AG_addHyperbolaBy3Point(a, b, (BG_Point) { "", 1, 1 });
+	//AG_addParabolaByPointLine(a, (BG_Line) { "", (BG_Point) { "", -2, 0 }, (BG_Point) { "", -2, 1 } });
 
-	BG_Point point = BA_getPedal(&a, BG_addLine(1, 1, 3, 4, 0));
-	BG_addPoint(a.x, a.y);
-	BG_addPoint(point.x, point.y);
+	//BG_Point point = BA_getPedal(&a, BG_addLine(1, 1, 3, 4, 0));
+	//BG_addPoint(a.x, a.y);
+	//BG_addPoint(point.x, point.y);
 
 	//AG_addSector(1, 2, 2, 90, 180, "red");
 	
@@ -190,18 +191,18 @@ void Main()
 	///* 弧 = 弧上三个点，1、3点是端点*/
 	//VA_arc3Point(5, -5, 4, -4, 0, -3);
 
-	/* 扇面 = 圆心 + 两端点（第二个端点是不是端点无所谓）*/
-	VA_sectorCenterPoint(1, 1, 2, 1, 3, 3, "red");
+	///* 扇面 = 圆心 + 两端点（第二个端点是不是端点无所谓）*/
+	//VA_sectorCenterPoint(1, 1, 2, 1, 3, 3, "red");
 
-	/* 扇面 = 扇面的弧上三个点*/
-	VA_sector3Point(4, 4, 5, 5, 6, 4, "blue");
-
-
-	BG_Point* pp = BG_addPoint(-3, 4);
-	BG_Line line = VL_tangent(BG_addArc(-3, -3, 4, 40, 400), pp, 0);
-	BG_addLine(line.point[0].x, line.point[0].y, line.point[1].x, line.point[1].y, 0);
+	///* 扇面 = 扇面的弧上三个点*/
+	//VA_sector3Point(4, 4, 5, 5, 6, 4, "blue");
 
 
+	//BG_Point* pp = BG_addPoint(-3, 4);
+	//BG_Line line = VL_tangent(BG_addArc(-3, -3, 4, 40, 400), pp, 0);
+	//BG_addLine(line.point[0].x, line.point[0].y, line.point[1].x, line.point[1].y, 0);
+
+	
 
 
 
